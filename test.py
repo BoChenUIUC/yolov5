@@ -447,7 +447,7 @@ def setup_opt():
     opt = parser.parse_args()
     opt.save_json |= opt.data.endswith('coco.yaml')
     opt.data = check_file(opt.data)  # check file
-    check_requirements()
+    # check_requirements()
     return opt
 
 class Simulator:
