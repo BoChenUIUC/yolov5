@@ -220,8 +220,8 @@ def train(net):
 			print(print_str)
 			log_file.write(print_str+'\n')
 			# transform to tensor
-			inputs = torch.FloatTensor(inputs).cuda()
-			labels = torch.FloatTensor(labels).cuda()
+			inputs = torch.FloatTensor(inputs)#.cuda()
+			labels = torch.FloatTensor(labels)#.cuda()
 
 			# zero gradient
 			optimizer.zero_grad()
@@ -250,6 +250,6 @@ if __name__ == "__main__":
 	# prepare network
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
-	net = net.cuda()
+	# net = net.cuda()
 	train(net)
 
