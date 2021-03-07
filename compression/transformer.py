@@ -7,7 +7,7 @@ import glob
 from torchvision import transforms
 from torch.utils.data import Dataset
 from collections import OrderedDict
-from PIL import  ImageChops
+from PIL import Image
 
 dataset = 'ucf101-24'
 
@@ -179,60 +179,34 @@ def region_disturber(image,label,r_in,r_out):
 # calculate the density
 # should compare  
 # percentage of features/percentage of area
-def analyzer(images,targets):
-	means = (104, 117, 123)
-	w,h = 1024,512
-	cnt = 0
-	avg_dens1,avg_dens2 = np.zeros(9,dtype=np.float64),np.zeros(9,dtype=np.float64)
-	for image,label in zip(images,targets):
-		for ch in range(0,3):
-			image[ch,:,:] += means[2-ch]
-		rgb_frame = image.permute(1,2,0).numpy().astype(np.uint8)
-		bgr_frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
-		label = label.numpy()
-		ROIs  =[]
-		for x1,y1,x2,y2,_  in label:
-			x1*=1024;x2*=1024;y1*=512;y2*=512
-			ROIs.append([int(x1),int(y1),int(x2),int(y2)])
-		# edge diff
-		edge, _ = get_edge_feature(bgr_frame)
-		# *kaze feat
-		kaze, _ = get_KAZE_feature(bgr_frame)
-		# harris corner
-		hc, _ = get_harris_corner(bgr_frame)
-		# GFTT
-		gftt, _ = get_GFTT(bgr_frame)
-		# *SIFT
-		sift, _ = get_SIFT(bgr_frame)
-		# *SURF
-		surf, _ = get_SURF(bgr_frame)
-		# FAST
-		fast, _ = get_FAST(bgr_frame)
-		# STAR
-		star, _ = get_STAR(bgr_frame)
-		# ORB
-		orb, _ = get_ORB(bgr_frame)
+def analyzer(image):
+	# analyze features in image
+	bgr_frame = np.array(image)
+	# # edge diff
+	# edge, _ = get_edge_feature(bgr_frame)
+	# # harris corner
+	# hc, _ = get_harris_corner(bgr_frame)
+	# # GFTT
+	# gftt, _ = get_GFTT(bgr_frame)
+	# # FAST
+	# fast, _ = get_FAST(bgr_frame)
+	# # STAR
+	# star, _ = get_STAR(bgr_frame)
+	# # ORB
+	# orb, _ = get_ORB(bgr_frame)
 
-		point_features = [gftt, kaze, sift, surf, fast, star, orb]
-		map_features = [edge,hc]
-		in_roi,out_roi = ROI_area(ROIs,w,h)
-		density1,density2 = [],[]
-		for mp in map_features:
-			c1,c2 = count_mask_in_ROI(ROIs,mp)
-			density1+=['{:0.6f}'.format(c1*1.0/in_roi)]
-			density2+=['{:0.6f}'.format(c2*1.0/out_roi)]
-		for points in point_features:
-			c1,c2 = count_point_in_ROI(ROIs,points)
-			density1+=['{:0.6f}'.format(c1*1.0/in_roi)]
-			density2+=['{:0.6f}'.format(c2*1.0/out_roi)]
-
-		for ch in range(0,3):
-			image[ch,:,:] -= means[2-ch]
-
-		cnt += 1
-		avg_dens1 += np.array(density1,dtype=np.float64)
-		avg_dens2 += np.array(density2,dtype=np.float64)
-	return avg_dens1/4,avg_dens2/4
+	# # edge diff
+	# edge, _ = get_edge_feature(bgr_frame)
+	# # harris corner
+	# hc, _ = get_harris_corner(bgr_frame)
+	# # GFTT
+	# gftt, _ = get_GFTT(bgr_frame)
+	# FAST
+	fast, _ = get_FAST(bgr_frame)
+	# STAR
+	star, _ = get_STAR(bgr_frame)
+	# ORB
+	orb, _ = get_ORB(bgr_frame)
 
 class LRU(OrderedDict):
 
@@ -370,4 +344,4 @@ class Transformer:
 if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
     img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
-    
+    analyzer(img)
