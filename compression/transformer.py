@@ -232,7 +232,7 @@ def tile_disturber(image, C_param):
 	# divide image to 4*3 tiles
 	ROIs = []
 	num_w, num_h = 4,3
-	img_w,img_h = bgr_frame.shape[:2]
+	img_h,img_w = bgr_frame.shape[:2]
 	tilew,tileh = img_w//num_w,img_h//num_h
 	if img_w%num_w != 0:tilew += 1
 	if img_h%num_h != 0:tileh += 1

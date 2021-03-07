@@ -143,7 +143,7 @@ class C_Generator:
 		state = np.float32(self.paretoFront.get_observation())
 		self.action = self.trainer.get_exploration_action(state)
 		# self.C_param = self.uniform_init_gen()
-		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
+		# self.action = np.array([.1,.1,.1,0,0,0],dtype=np.float64)
 		return self.action
 
 	def uniform_init_gen(self):
@@ -153,7 +153,6 @@ class C_Generator:
 		output[4] = np.random.randint(output[3],11)
 		output[:5] /= 10
 		output[5] = np.random.randint(0,5) #[1/3,1/2,1,2,3]
-		# output = np.array([1,1,1,1,1,2],dtype=np.float64)
 		return output   
 
 	def optimize(self, datapoint, done):
