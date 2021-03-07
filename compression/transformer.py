@@ -182,25 +182,6 @@ def region_disturber(image,label,r_in,r_out):
 def analyzer(image):
 	# analyze features in image
 	bgr_frame = np.array(image)
-	# # edge diff
-	# edge, _ = get_edge_feature(bgr_frame)
-	# # harris corner
-	# hc, _ = get_harris_corner(bgr_frame)
-	# # GFTT
-	# gftt, _ = get_GFTT(bgr_frame)
-	# # FAST
-	# fast, _ = get_FAST(bgr_frame)
-	# # STAR
-	# star, _ = get_STAR(bgr_frame)
-	# # ORB
-	# orb, _ = get_ORB(bgr_frame)
-
-	# # edge diff
-	# edge, _ = get_edge_feature(bgr_frame)
-	# # harris corner
-	# hc, _ = get_harris_corner(bgr_frame)
-	# # GFTT
-	# gftt, _ = get_GFTT(bgr_frame)
 	# FAST
 	fast, _ = get_FAST(bgr_frame)
 	# STAR
@@ -251,10 +232,13 @@ def tile_disturber(image, C_param):
 	# divide image to 4*3 tiles
 	ROIs = []
 	num_w, num_h = 4,3
-	tilew,tileh = 320//num_w,240//num_h
+	img_w,img_h = bgr_frame.shape[:2]
+	tilew,tileh = img_w//num_w,img_h//num_h
+	if img_w%num_w != 0:tilew += 1
+	if img_h%num_h != 0:tileh += 1
 	for row in range(num_h):
 		for col in range(num_w):
-			x1 = col*tilew; x2 = (col+1)*tilew; y1 = row*tileh; y2 = (row+1)*tileh
+			x1 = col*tilew; x2 = min((col+1)*tilew,img_w); y1 = row*tileh; y2 = min((row+1)*tileh,img_h)
 			ROIs.append([x1,y1,x2,y2])
 	counts = np.zeros((num_w*num_h,num_features))
 	for roi_idx,ROI in enumerate(ROIs):
@@ -287,24 +271,24 @@ def tile_disturber(image, C_param):
 	# the weight is more valuable when its value is higher
 	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
 
-	tile_sizes = [(int(np.rint(tilew*r)),int(np.rint(tileh*r))) for r in quality]
+	tile_sizes = [(int(np.rint((x2-x1)*r)),int(np.rint((y2-y1)*r))) for x1,y1,x2,y2 in ROIs]
 
 	# not used for training,but can be used for 
 	# ploting the pareto front
 	compressed_size = 0
 	tile_size = tilew * tileh
 	for roi,dsize in zip(ROIs,tile_sizes):
-		if dsize == (tilew,tileh):
-			compressed_size += tilew*tileh
-			continue
 		x1,y1,x2,y2 = roi
+		if dsize == (x2-x1,y2-y1):
+			compressed_size += (x2-x1)*(y2-y1)
+			continue
 		crop = bgr_frame[y1:y2,x1:x2].copy()
 		if dsize[0]==0 or dsize[1]==0:
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
 			try:
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-				crop = cv2.resize(crop_d, dsize=(tilew,tileh), interpolation=cv2.INTER_LINEAR)
+				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
 			except Exception as e:
 				print(repr(e))
 				print(C_param,tile_sizes)
@@ -330,6 +314,7 @@ class Transformer:
 	def transform(self, image=None, C_param=None):
 		self.original_size += image.shape[0]*image.shape[1]
 		image,comp_sz = tile_disturber(image, C_param)
+		print(image,comp_sz)
 		self.compressed_size += comp_sz
 		return image
 
