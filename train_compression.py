@@ -10,11 +10,11 @@ from compression.transformer import Transformer
 from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
-
+from tqdm import tqdm
 
 # setup
 classes_num = 24
-batch_size = 4
+batch_size = 1
 print_step = 1
 eval_step = 1
 PATH = 'backup/rsnet.pth'
