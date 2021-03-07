@@ -215,8 +215,6 @@ def train(net):
 				labels.append(sim_result) # accuracy of IoU=0.5
 			# optimize generator
 			cgen.optimize((np.mean(batch_acc),np.mean(batch_cr)),False)
-			print_str = str(cgen.paretoFront.data.keys())
-			print(print_str)
 			log_file.write(print_str+'\n')
 			# transform to tensor
 			inputs = torch.FloatTensor(inputs)#.cuda()
@@ -237,11 +235,13 @@ def train(net):
 			print_str = '{:d}, {:d}, loss {:.6f}, val loss {:.6f}'.format(epoch + 1, bi + 1, loss.item(), val_loss)
 			print(print_str)
 			log_file.write(print_str + '\n')
-			if bi % print_step == (print_step-1) and bi>0:    
-				print_str = '{:d}, {:d}, loss {:.6f}'.format(epoch + 1, bi + 1, running_loss / print_step)
-				print(print_str)
-				log_file.write(print_str + '\n')
-				running_loss = 0.0
+			# if bi % print_step == (print_step-1) and bi>0:    
+			# 	print_str = '{:d}, {:d}, loss {:.6f}'.format(epoch + 1, bi + 1, running_loss / print_step)
+			# 	print(print_str)
+			# 	log_file.write(print_str + '\n')
+			# 	running_loss = 0.0
+		print_str = str(cgen.paretoFront.data.keys())
+		print(print_str)
 		cgen.optimize(None,True)
 		torch.save(net.state_dict(), PATH)
 
