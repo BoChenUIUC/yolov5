@@ -209,7 +209,7 @@ def train(net):
 				cr = TF.get_compression_ratio()
 				batch_acc += [sim_result]
 				batch_cr += [cr]
-				print_str = str(class_idx)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
+				print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
 				print(print_str)
 				log_file.write(print_str+'\n')
 				inputs.append(C_param)
