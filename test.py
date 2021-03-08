@@ -283,10 +283,10 @@ def get_model(opt):
     # Load model
     print(device)
     model = attempt_load(opt.weights, map_location=device)  # load FP32 model
-    # Half
-    half = device.type != 'cpu'  # half precision only supported on CUDA
-    if half:
-        model.half()
+    # # Half
+    # half = device.type != 'cpu'  # half precision only supported on CUDA
+    # if half:
+    #     model.half()
     model.eval()
     print(device.type)
     if device.type != 'cpu':
