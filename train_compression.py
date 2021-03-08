@@ -120,10 +120,10 @@ class ParetoFront:
 			left = datapoint[0]
 		return area
 
-
 	def get_observation(self):
 		new_state = np.concatenate((self.dominating_c_param/self.dominating_cnt,self.dominated_c_param/self.dominated_cnt))
 		if int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion:
+			print(self.data.keys())
 			self._reset()
 		return new_state
 
@@ -175,44 +175,38 @@ def RL_train(net):
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 	log_file = open('training.log', "w", 1)
-	log_file.write('Training...\n')
 
 	# setup target network
 	# so that we only do this once
 	sim = Simulator()
 	cgen = C_Generator()
-	num_batch = sim.point_per_sim//batch_size
-	print('Num batches:',num_batch,sim.point_per_sim)
+	num_cfg = 100 # number of cfgs to be explored
+	selected_ranges = [10,50,100,500,1000,2000]
+	print('Num batches:',num_cfg,sim.num_batches)
 
-	for epoch in range(10):
-		running_loss = 0.0
-		TF = Transformer('compression')
-		# the pareto front can be restarted, need to try
+	TF = Transformer('compression')
+	# the pareto front can be restarted, need to try
 
-		for bi in range(num_batch):
-			inputs,labels = [],[]
-			# DDPG-based generator
-			C_param = cgen.get()
-			# start counting the compressed size
-			TF.reset()
-			# apply the compression param chosen by the generator
-			fetch_start = time.perf_counter()
-			# the function to get results from cloud model
-			sim_result = sim.get_one_point(index=bi, TF=TF, C_param=np.copy(C_param))
-			fetch_end = time.perf_counter()
-			# get the compression ratio
-			cr = TF.get_compression_ratio()
-			print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
-			print(print_str)
-			log_file.write(print_str+'\n')
-			# optimize generator
-			cgen.optimize((np.mean(batch_acc),np.mean(batch_cr)),False)
-			log_file.write(print_str+'\n')
-
-		print_str = str(cgen.paretoFront.data.keys())
+	for bi in range(num_cfg):
+		# DDPG-based generator
+		C_param = cgen.get()
+		print_str = str(bi)+str(C_param)
 		print(print_str)
-		cgen.optimize(None,True)
-		torch.save(net.state_dict(), PATH)
+		# apply the compression param chosen by the generator
+		fetch_start = time.perf_counter()
+		dps = []
+		print_str = str(bi)
+		for r in selected_ranges:
+			# the function to get results from cloud model
+			dp = sim.get_one_point(datarange=(0,r), TF=TF, C_param=np.copy(C_param))
+			dps.append(dp)
+			print_str += '\t'+str(dp[0])+'\t'+str(dp[1])
+		print(print_str)
+		log_file.write(print_str + '\n')
+		# optimize generator
+		cgen.optimize(dps[-1],False)
+
+	torch.save(net.state_dict(), PATH)
 
 def dual_train(net):
 	np.random.seed(123)
@@ -225,15 +219,15 @@ def dual_train(net):
 	# so that we only do this once
 	sim = Simulator(10)
 	cgen = C_Generator()
-	num_batch = 1#sim.point_per_sim//batch_size
-	print('Num batches:',num_batch,sim.point_per_sim)
+	num_cfg = 1#sim.point_per_sim//batch_size
+	print('Num batches:',num_cfg,sim.point_per_sim)
 
 	for epoch in range(10):
 		running_loss = 0.0
 		TF = Transformer('compression')
 		# the pareto front can be restarted, need to try
 
-		for bi in range(num_batch):
+		for bi in range(num_cfg):
 			inputs,labels = [],[]
 			# DDPG-based generator
 			C_param = cgen.get()
@@ -289,5 +283,5 @@ if __name__ == "__main__":
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	dual_train(net)
+	RL_train(net)
 

@@ -283,12 +283,11 @@ def get_model(opt):
     # Load model
     print(device)
     model = attempt_load(opt.weights, map_location=device)  # load FP32 model
-    # # Half
-    # half = device.type != 'cpu'  # half precision only supported on CUDA
-    # if half:
-    #     model.half()
+    # Half
+    half = device.type != 'cpu'  # half precision only supported on CUDA
+    if half:
+        model.half()
     model.eval()
-    print(device.type)
     if device.type != 'cpu':
         model(torch.zeros(1, 3, opt.img_size, opt.img_size).to(device).type_as(next(model.parameters())))  # run once
     return model
@@ -431,8 +430,8 @@ def setup_opt():
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.65, help='IOU threshold for NMS')
-    parser.add_argument('--task', default='val', help="'val', 'test', 'study'")
-    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--task', default='train', help="'val', 'test', 'study'")
+    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--single-cls', action='store_true', help='treat as single-class dataset')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--verbose', action='store_true', help='report mAP by class')
@@ -450,24 +449,23 @@ def setup_opt():
     return opt
 
 class Simulator:
-    def __init__(self,batch_per_point):
+    def __init__(self):
         self.opt = setup_opt()
         self.model = get_model(self.opt)
         self.dataloader,self.nc = get_dataloader(self.opt,self.model)
-        self.batch_per_point = batch_per_point
-        self.point_per_sim = len(self.dataloader)//self.batch_per_point
+        self.num_batches = len(self.dataloader)
 
-    def get_one_point(self, index, TF=None, C_param=None):
-        assert(index<self.point_per_sim)
-        # create batch idxes for simulation
-        total_batches = len(self.dataloader)
-        batch_idx_range = (index*self.batch_per_point,(index+1)*self.batch_per_point)
-        map50 = runmodel(self.opt,self.model,self.dataloader,self.nc,batch_idx_range,TF,C_param)
-        return map50
+    def get_one_point(self, datarange, TF=None, C_param=None):
+        # start counting the compressed size
+        TF.reset()
+        map50 = runmodel(self.opt,self.model,self.dataloader,self.nc,datarange,TF,C_param)
+        # get the compression ratio
+        cr = TF.get_compression_ratio()
+        return map50,cr
 
 if __name__ == '__main__':
     sim = Simulator(10)
-    r = sim.get_one_point(0)
+    r = sim.get_one_point(0,10)
     print(r,sim.point_per_sim)
     # opt = setup_opt()
     # print(opt)
