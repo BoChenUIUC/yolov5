@@ -182,7 +182,7 @@ def RL_train(net):
 	sim = Simulator()
 	cgen = C_Generator()
 	num_cfg = 100 # number of cfgs to be explored
-	selected_ranges = range(10,110,10)#[10,50,100,500,1000,2000]
+	selected_ranges = [10,50,100,500,1000,2000]
 	print('Num batches:',num_cfg,sim.num_batches)
 
 	TF = Transformer('compression')
