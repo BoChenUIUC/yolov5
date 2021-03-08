@@ -170,7 +170,7 @@ class C_Generator:
 		self.trainer.optimize()
 
 
-def train(net):
+def RL_train(net):
 	np.random.seed(123)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -182,6 +182,54 @@ def train(net):
 	sim = Simulator()
 	cgen = C_Generator()
 	num_batch = sim.point_per_sim//batch_size
+	print('Num batches:',num_batch,sim.point_per_sim)
+
+	for epoch in range(10):
+		running_loss = 0.0
+		TF = Transformer('compression')
+		# the pareto front can be restarted, need to try
+
+		for bi in range(num_batch):
+			inputs,labels = [],[]
+			# DDPG-based generator
+			C_param = cgen.get()
+			
+				di = bi*batch_size + k # data index
+				# start counting the compressed size
+				TF.reset()
+				# apply the compression param chosen by the generator
+				fetch_start = time.perf_counter()
+				# the function to get results from cloud model
+				sim_result = sim.get_one_point(index=bi, TF=TF, C_param=np.copy(C_param))
+				fetch_end = time.perf_counter()
+				# get the compression ratio
+				cr = TF.get_compression_ratio()
+				batch_acc += [sim_result]
+				batch_cr += [cr]
+				print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
+				print(print_str)
+				log_file.write(print_str+'\n')
+			# optimize generator
+			cgen.optimize((np.mean(batch_acc),np.mean(batch_cr)),False)
+			log_file.write(print_str+'\n')
+
+		print_str = str(cgen.paretoFront.data.keys())
+		print(print_str)
+		cgen.optimize(None,True)
+		torch.save(net.state_dict(), PATH)
+
+def dual_train(net):
+	np.random.seed(123)
+	criterion = nn.MSELoss(reduction='sum')
+	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+	log_file = open('training.log', "w", 1)
+	log_file.write('Training...\n')
+
+	# setup target network
+	# so that we only do this once
+	sim = Simulator(157)
+	cgen = C_Generator()
+	num_batch = 1#sim.point_per_sim//batch_size
 	print('Num batches:',num_batch,sim.point_per_sim)
 
 	for epoch in range(10):
@@ -235,11 +283,6 @@ def train(net):
 			print_str = '{:d}, {:d}, loss {:.6f}, val loss {:.6f}'.format(epoch + 1, bi + 1, loss.item(), val_loss)
 			print(print_str)
 			log_file.write(print_str + '\n')
-			# if bi % print_step == (print_step-1) and bi>0:    
-			# 	print_str = '{:d}, {:d}, loss {:.6f}'.format(epoch + 1, bi + 1, running_loss / print_step)
-			# 	print(print_str)
-			# 	log_file.write(print_str + '\n')
-			# 	running_loss = 0.0
 		print_str = str(cgen.paretoFront.data.keys())
 		print(print_str)
 		cgen.optimize(None,True)
@@ -250,5 +293,5 @@ if __name__ == "__main__":
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	train(net)
+	dual_train(net)
 

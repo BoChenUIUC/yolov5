@@ -450,11 +450,11 @@ def setup_opt():
     return opt
 
 class Simulator:
-    def __init__(self):
+    def __init__(self,batch_per_point):
         self.opt = setup_opt()
         self.model = get_model(self.opt)
         self.dataloader,self.nc = get_dataloader(self.opt,self.model)
-        self.batch_per_point = 4
+        self.batch_per_point = batch_per_point
         self.point_per_sim = len(self.dataloader)//self.batch_per_point
 
     def get_one_point(self, index, TF=None, C_param=None):
