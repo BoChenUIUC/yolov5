@@ -172,6 +172,7 @@ class C_Generator:
 
 def RL_train(net):
 	np.random.seed(123)
+	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 	log_file = open('training.log', "w", 1)
@@ -181,7 +182,7 @@ def RL_train(net):
 	sim = Simulator()
 	cgen = C_Generator()
 	num_cfg = 100 # number of cfgs to be explored
-	selected_ranges = [10,50,100,500,1000,2000]
+	selected_ranges = range(10,110,10)#[10,50,100,500,1000,2000]
 	print('Num batches:',num_cfg,sim.num_batches)
 
 	TF = Transformer('compression')

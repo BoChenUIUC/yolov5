@@ -297,11 +297,10 @@ def tile_disturber(image, C_param):
 				exit(1)
 			compressed_size += dsize[0]*dsize[1]
 			bgr_frame[y1:y2,x1:x2] = crop
-	pil_image = Image.fromarray(bgr_frame)
 
 	feat_end = time.perf_counter()
 	# print(img_index,feat_end-feat_start)
-	return image,compressed_size
+	return bgr_frame,compressed_size
 
 def JPEG_disturber(image, C_param):
 	return image
@@ -314,9 +313,9 @@ class Transformer:
 
 	def transform(self, image=None, C_param=None):
 		self.original_size += image.shape[0]*image.shape[1]
-		image,comp_sz = tile_disturber(image, C_param)
+		rimage,comp_sz = tile_disturber(image, C_param)
 		self.compressed_size += comp_sz
-		return image
+		return rimage
 
 	def reset(self):
 		self.compressed_size = 0

@@ -334,12 +334,13 @@ def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
             tf_imgs = None
             for th_img in img:
                 np_img = th_img.permute(1,2,0).numpy()
-                tf_img = TF.transform(image=np_img[:,:,::-1], C_param=C_param)
-                tf_img = torch.from_numpy(tf_img[:,:,::-1]).float().permute(2,0,1).unsqueeze(0)
+                tf_img = TF.transform(image=np_img[:,:,(2,1,0)], C_param=C_param)
+                tf_img = torch.from_numpy(tf_img[:,:,(2,1,0)]).float().permute(2,0,1).unsqueeze(0)
                 if tf_imgs is None:
                     tf_imgs = tf_img
                 else:
                     tf_imgs = torch.cat((tf_imgs,tf_img),0)
+            img = tf_imgs
         # end transformation
         if half: img = img.cuda()
         # img = img.to(device, non_blocking=True)
