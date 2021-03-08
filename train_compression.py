@@ -193,22 +193,18 @@ def RL_train(net):
 			inputs,labels = [],[]
 			# DDPG-based generator
 			C_param = cgen.get()
-			
-				di = bi*batch_size + k # data index
-				# start counting the compressed size
-				TF.reset()
-				# apply the compression param chosen by the generator
-				fetch_start = time.perf_counter()
-				# the function to get results from cloud model
-				sim_result = sim.get_one_point(index=bi, TF=TF, C_param=np.copy(C_param))
-				fetch_end = time.perf_counter()
-				# get the compression ratio
-				cr = TF.get_compression_ratio()
-				batch_acc += [sim_result]
-				batch_cr += [cr]
-				print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
-				print(print_str)
-				log_file.write(print_str+'\n')
+			# start counting the compressed size
+			TF.reset()
+			# apply the compression param chosen by the generator
+			fetch_start = time.perf_counter()
+			# the function to get results from cloud model
+			sim_result = sim.get_one_point(index=bi, TF=TF, C_param=np.copy(C_param))
+			fetch_end = time.perf_counter()
+			# get the compression ratio
+			cr = TF.get_compression_ratio()
+			print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
+			print(print_str)
+			log_file.write(print_str+'\n')
 			# optimize generator
 			cgen.optimize((np.mean(batch_acc),np.mean(batch_cr)),False)
 			log_file.write(print_str+'\n')
