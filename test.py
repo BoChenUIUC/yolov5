@@ -464,9 +464,9 @@ class Simulator:
         return map50,cr
 
 if __name__ == '__main__':
-    sim = Simulator(10)
+    sim = Simulator()
     r = sim.get_one_point(0,10)
-    print(r,sim.point_per_sim)
+    print(r)
     # opt = setup_opt()
     # print(opt)
     exit(0)
