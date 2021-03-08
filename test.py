@@ -457,10 +457,10 @@ class Simulator:
 
     def get_one_point(self, datarange, TF=None, C_param=None):
         # start counting the compressed size
-        TF.reset()
+        if TF is not None: TF.reset()
         map50 = runmodel(self.opt,self.model,self.dataloader,self.nc,datarange,TF,C_param)
         # get the compression ratio
-        cr = TF.get_compression_ratio()
+        cr = TF.get_compression_ratio() if TF is not None else 0
         return map50,cr
 
 if __name__ == '__main__':
