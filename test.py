@@ -453,7 +453,7 @@ class Simulator:
         self.opt = setup_opt()
         self.model = get_model(self.opt)
         self.dataloader,self.nc = get_dataloader(self.opt,self.model)
-        self.batch_per_point = len(self.dataloader)
+        self.batch_per_point = 4
         self.point_per_sim = len(self.dataloader)//self.batch_per_point
 
     def get_one_point(self, index, TF=None, C_param=None):
