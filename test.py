@@ -465,7 +465,7 @@ class Simulator:
 
 if __name__ == '__main__':
     sim = Simulator()
-    r = sim.get_one_point(0,10)
+    r = sim.get_one_point((0,10))
     print(r)
     # opt = setup_opt()
     # print(opt)
