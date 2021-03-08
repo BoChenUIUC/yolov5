@@ -223,7 +223,7 @@ def dual_train(net):
 
 	# setup target network
 	# so that we only do this once
-	sim = Simulator(157)
+	sim = Simulator(10)
 	cgen = C_Generator()
 	num_batch = 1#sim.point_per_sim//batch_size
 	print('Num batches:',num_batch,sim.point_per_sim)
