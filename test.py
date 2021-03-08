@@ -289,6 +289,7 @@ def get_model(opt):
         model.half()
     model.eval()
     if device.type != 'cpu':
+        model.cuda()
         model(torch.zeros(1, 3, opt.img_size, opt.img_size).to(device).type_as(next(model.parameters())))  # run once
     return model
 
@@ -312,9 +313,12 @@ def get_dataloader(opt,model):
 def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
     device = select_device(opt.device, batch_size=opt.batch_size)
     
-    iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
-    niou = iouv.numel()
     half = device.type != 'cpu'
+    if half:
+        iouv = torch.linspace(0.5, 0.95, 10).cuda()
+    else:
+        iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+    niou = iouv.numel()
 
     seen = 0
     names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
@@ -337,10 +341,12 @@ def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
                 else:
                     tf_imgs = torch.cat((tf_imgs,tf_img),0)
         # end transformation
-        img = img.to(device, non_blocking=True)
+        if half: img = img.cuda()
+        # img = img.to(device, non_blocking=True)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
-        targets = targets.to(device)
+        if half:targets = targets.cuda()
+        # targets = targets.to(device)
         nb, _, height, width = img.shape  # batch size, channels, height, width
 
         with torch.no_grad():
@@ -350,7 +356,10 @@ def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
             t0 += time_synchronized() - t
 
             # Run NMS
-            targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
+            if half:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+            else:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
             out = non_max_suppression(out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
@@ -373,7 +382,10 @@ def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
             scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
 
             # Assign all predictions as incorrect
-            correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
+            if half:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+            else:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
             if nl:
                 detected = []  # target indices
                 tcls_tensor = labels[:, 0]
