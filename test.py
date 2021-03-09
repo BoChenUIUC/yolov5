@@ -310,7 +310,7 @@ def get_dataloader(opt,model):
                                    prefix=colorstr(opt.task + ':'))[0]
     return dataloader,nc
 
-def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
+def run_model(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
     device = select_device(opt.device, batch_size=opt.batch_size)
     
     half = device.type != 'cpu'
@@ -435,6 +435,143 @@ def runmodel(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
 
     return map50
 
+def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
+    device = select_device(opt.device, batch_size=opt.batch_size)
+    
+    half = device.type != 'cpu'
+    if half:
+        iouv = torch.linspace(0.5, 0.95, 10).cuda()
+    else:
+        iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+    niou = iouv.numel()
+
+    seen = 0
+    names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
+    coco91class = coco80_to_coco91_class()
+    s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
+    p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+    stats, ap, ap_class = [], [], []
+    crs = []
+    for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
+        if batch_i>=ranges[-1]:break
+        # perform transformation
+        if TF is not None:
+            tf_imgs = None
+            for th_img in img:
+                np_img = th_img.permute(1,2,0).numpy()
+                tf_img = TF.transform(image=np_img[:,:,(2,1,0)], C_param=C_param)
+                tf_img = torch.from_numpy(tf_img[:,:,(2,1,0)]).float().permute(2,0,1).unsqueeze(0)
+                if tf_imgs is None:
+                    tf_imgs = tf_img
+                else:
+                    tf_imgs = torch.cat((tf_imgs,tf_img),0)
+            img = tf_imgs
+        # end transformation
+        if half: img = img.cuda()
+        # img = img.to(device, non_blocking=True)
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if half:targets = targets.cuda()
+        # targets = targets.to(device)
+        nb, _, height, width = img.shape  # batch size, channels, height, width
+
+        with torch.no_grad():
+            # Run model
+            t = time_synchronized()
+            out, train_out = model(img, augment=opt.augment)  # inference and training outputs
+            t0 += time_synchronized() - t
+
+            # Run NMS
+            if half:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+            else:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
+            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
+            t = time_synchronized()
+            out = non_max_suppression(out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            t1 += time_synchronized() - t
+
+        # Statistics per image
+        for si, pred in enumerate(out):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl = len(labels)
+            tcls = labels[:, 0].tolist() if nl else []  # target class
+            seen += 1
+
+            if len(pred) == 0:
+                if nl:
+                    stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
+                continue
+
+            # Predictions
+            predn = pred.clone()
+            scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
+
+            # Assign all predictions as incorrect
+            if half:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+            else:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
+            if nl:
+                detected = []  # target indices
+                tcls_tensor = labels[:, 0]
+
+                # target boxes
+                tbox = xywh2xyxy(labels[:, 1:5])
+                scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+
+                # Per target class
+                for cls in torch.unique(tcls_tensor):
+                    ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
+                    pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
+
+                    # Search for detections
+                    if pi.shape[0]:
+                        # Prediction to target ious
+                        ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
+
+                        # Append detections
+                        detected_set = set()
+                        for j in (ious > iouv[0]).nonzero(as_tuple=False):
+                            d = ti[i[j]]  # detected target
+                            if d.item() not in detected_set:
+                                detected_set.add(d.item())
+                                detected.append(d)
+                                correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+                                if len(detected) == nl:  # all targets already located in image
+                                    break
+
+            # Append statistics (correct, conf, pcls, tcls)
+            stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+        if (batch_i+1) in ranges:
+            crs += [TF.get_compression_ratio() if TF is not None else 0]
+
+    # Compute statistics
+    metrics = []
+    for right in ranges:
+        metrics += [stat_to_map(stats[:right*opt.batch_size],names,nc)]
+
+    # Print results
+    pf = '%20s' + '%12.3g' * 6  # print format
+    for nt,mp,mr,map50,map in metrics:
+        print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+
+    map50s = [m[3] for m in metrics]
+
+    return map50s,crs
+
+def stat_to_map(stats,names,nc):
+    mp, mr, map50 = 0.,0.,0.
+    stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
+    if len(stats) and stats[0].any():
+        p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, names=names)
+        ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
+    else:
+        nt = torch.zeros(1)
+    return (nt,mp,mr,map50,map)
+
 def setup_opt():
     parser = argparse.ArgumentParser(prog='test.py')
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
@@ -471,10 +608,15 @@ class Simulator:
     def get_one_point(self, datarange, TF=None, C_param=None):
         # start counting the compressed size
         if TF is not None: TF.reset()
-        map50 = runmodel(self.opt,self.model,self.dataloader,self.nc,datarange,TF,C_param)
+        map50 = run_model(self.opt,self.model,self.dataloader,self.nc,datarange,TF,C_param)
         # get the compression ratio
         cr = TF.get_compression_ratio() if TF is not None else 0
         return map50,cr
+
+    def get_multi_point(self, ranges, TF=None, C_param=None):
+        if TF is not None: TF.reset()
+        map50s,crs = run_model_multi_range(self.opt,self.model,self.dataloader,self.nc,ranges,TF,C_param)
+        return map50s,crs
 
 if __name__ == '__main__':
     sim = Simulator()

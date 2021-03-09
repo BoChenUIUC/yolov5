@@ -192,20 +192,20 @@ def RL_train(net):
 		# DDPG-based generator
 		C_param = cgen.get()
 		print_str = str(bi)+str(C_param)
-		print(print_str)
 		# apply the compression param chosen by the generator
-		fetch_start = time.perf_counter()
-		dps = []
-		print_str = str(bi)
-		for r in selected_ranges:
-			# the function to get results from cloud model
-			dp = sim.get_one_point(datarange=(0,r), TF=TF, C_param=np.copy(C_param))
-			dps.append(dp)
-			print_str += '\t'+str(dp[0])+'\t'+str(dp[1])
+		map50s,crs = sim.get_multi_point(selected_ranges, TF=TF, C_param=np.copy(C_param))
+		print_str += str(map50s) + ' ' + str(crs)
 		print(print_str)
 		log_file.write(print_str + '\n')
 		# optimize generator
-		cgen.optimize(dps[-1],False)
+		cgen.optimize((map50s[-1],crs[-1]),False)
+		# dps = []
+		# for r in selected_ranges:
+		# 	# the function to get results from cloud model
+		# 	dp = sim.get_one_point(datarange=(0,r), TF=TF, C_param=np.copy(C_param))
+		# 	dps.append(dp)
+		# 	print_str += '\t'+str(dp[0])+'\t'+str(dp[1])
+		# cgen.optimize(dps[-1],False)
 
 	torch.save(net.state_dict(), PATH)
 
