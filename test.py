@@ -452,7 +452,9 @@ def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
     stats, ap, ap_class = [], [], []
     crs = []
-    for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
+    metrics = []
+    test_iter = tqdm(dataloader, disable=False)
+    for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
         if batch_i>=ranges[-1]:break
         # perform transformation
         if TF is not None:
@@ -545,16 +547,16 @@ def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
         if (batch_i+1) in ranges:
             crs += [TF.get_compression_ratio() if TF is not None else 0]
+            metrics += [stat_to_map(stats,names,nc)]
+        cr = crs[-1] if crs else 0
+        metric = metrics[-1][3] if metrics else [0,0,0,0,0]
+        test_iter.set_description(
+                f"Test Iter: {batch_i+1:3}/{len(dataloader):3}. "
+                f"NT: {metric[0]:3}. CR: {cr:.2f}. "
+                f"map50: {metric[3]:.2f}s. map: {metric[4]:.2f}s. "
+                f"MP: {accuracy:.2f}s. MR: {accuracy:.2f}s. ")
 
-    # Compute statistics
-    metrics = []
-    for right in ranges:
-        metrics += [stat_to_map(stats[:right*opt.batch_size],names,nc)]
-
-    # Print results
-    pf = '%20s' + '%12.3g' * 6  # print format
-    for nt,mp,mr,map50,map in metrics:
-        print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+    test_iter.close()
 
     map50s = [m[3] for m in metrics]
 
