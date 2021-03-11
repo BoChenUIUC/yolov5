@@ -550,12 +550,11 @@ def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
             metrics += [stat_to_map(stats,names,nc)]
         cr = crs[-1] if crs else 0
         metric = metrics[-1] if metrics else [0,0,0,0,0]
-        print(metric)
         test_iter.set_description(
                 f"Test Iter: {batch_i+1:3}/{len(dataloader):3}. "
-                f"NT: {metric[0]:3}. CR: {cr:.2f}. "
-                f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}s. "
-                f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}s. ")
+                f"NT: {metric[0].sum():3}. CR: {cr:.2f}. "
+                f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. ")
 
     test_iter.close()
 
