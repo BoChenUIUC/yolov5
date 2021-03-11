@@ -54,6 +54,8 @@ class ParetoFront:
 	def __init__(self):
 		self.stopping_criterion = 20
 		self._reset()
+		self.pf_file = open('pf.log', "w", 1)
+		self.reward_file = open('reward.log', "w", 1)
 
 	def _reset(self):
 		print('Reset environment.')
@@ -66,6 +68,7 @@ class ParetoFront:
 		self.dominated_cnt = 1e-6
 		self.dominating_c_param = np.zeros(6,dtype=np.float64)
 		self.dominating_cnt = 1e-6
+		self.reward = 0
 
 	def add(self, c_param, dp):
 		reward = 0
@@ -109,6 +112,7 @@ class ParetoFront:
 			self.dominated_cnt += 1
 
 		# what if there is a noisy point (.99,.99)
+		self.reward += reward
 		return reward
 
 	def _area(self):
@@ -123,7 +127,9 @@ class ParetoFront:
 	def get_observation(self):
 		new_state = np.concatenate((self.dominating_c_param/self.dominating_cnt,self.dominated_c_param/self.dominated_cnt))
 		if int(self.dominated_cnt + self.dominating_cnt)>=self.stopping_criterion:
-			print(self.data.keys())
+			print(self.reward,self.data.keys())
+			self.pf_file.write(str(self.data)+'\n')
+			self.reward_file.write(str(self.reward)+'\n')
 			self._reset()
 		return new_state
 
@@ -142,8 +148,10 @@ class C_Generator:
 		# get an action from the actor
 		state = np.float32(self.paretoFront.get_observation())
 		self.action = self.trainer.get_exploration_action(state)
-		# self.C_param = self.uniform_init_gen()
-		# self.action = np.array([.1,.1,.1,0,0,0],dtype=np.float64)
+		self.action[self.action<-.5] += 1
+		self.action[self.action>.5] -= 1
+		self.action = np.random.random(6)-0.5
+		# self.action = np.array([.1,.1,.1,.5,.5,0],dtype=np.float64)
 		return self.action
 
 	def uniform_init_gen(self):
@@ -175,14 +183,16 @@ def RL_train(net):
 	torch.manual_seed(2)
 	criterion = nn.MSELoss(reduction='sum')
 	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	log_file = open('training.log', "w", 1)
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
 
 	# setup target network
 	# so that we only do this once
 	sim = Simulator()
 	cgen = C_Generator()
-	num_cfg = 100 # number of cfgs to be explored
-	selected_ranges = [500,1000,1500,2000,2500,3000,3697]
+	num_cfg = 500 # number of cfgs to be explored
+	datarange = [0,100]
 	print('Num batches:',num_cfg,sim.num_batches)
 
 	TF = Transformer('compression')
@@ -191,21 +201,50 @@ def RL_train(net):
 	for bi in range(num_cfg):
 		# DDPG-based generator
 		C_param = cgen.get()
-		print_str = str(bi)+str(C_param)
+		# apply the compression param chosen by the generator
+		map50,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=np.copy(C_param))
+		# optimize generator
+		cgen.optimize((map50,cr),False)
+		# write logs
+		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
+		acc_file.write(str(map50)+'\n')
+		cr_file.write(str(cr)+'\n')
+		# if the total reward reaches some point, start profiling and end
+
+	torch.save(net.state_dict(), PATH)
+
+def test_run(net):
+	np.random.seed(123)
+	torch.manual_seed(2)
+	criterion = nn.MSELoss(reduction='sum')
+	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
+
+	# setup target network
+	# so that we only do this once
+	sim = Simulator()
+	cgen = C_Generator()
+	num_cfg = 100 # number of cfgs to be explored
+	selected_ranges = [10*i for i in range(1,10)]+[100*i for i in range(1,10)]+[1000*i for i in range(1,4)]+[3697]
+	print('Num batches:',num_cfg,sim.num_batches)
+
+	TF = Transformer('compression')
+	# the pareto front can be restarted, need to try
+
+	for bi in range(num_cfg):
+		# DDPG-based generator
+		C_param = cgen.get()
 		# apply the compression param chosen by the generator
 		map50s,crs = sim.get_multi_point(selected_ranges, TF=TF, C_param=np.copy(C_param))
-		print_str += str(map50s) + ' ' + str(crs)
-		print(print_str)
-		log_file.write(print_str + '\n')
 		# optimize generator
 		cgen.optimize((map50s[-1],crs[-1]),False)
-		# dps = []
-		# for r in selected_ranges:
-		# 	# the function to get results from cloud model
-		# 	dp = sim.get_one_point(datarange=(0,r), TF=TF, C_param=np.copy(C_param))
-		# 	dps.append(dp)
-		# 	print_str += '\t'+str(dp[0])+'\t'+str(dp[1])
-		# cgen.optimize(dps[-1],False)
+		# write logs
+		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
+		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
+		cr_file.write(' '.join([str(n) for n in crs])+'\n')
+		# if the total reward reaches some point, start profiling and end
 
 	torch.save(net.state_dict(), PATH)
 
@@ -284,5 +323,5 @@ if __name__ == "__main__":
 	net = RSNet()
 	# net.load_state_dict(torch.load('backup/rsnet.pth'))
 	# net = net.cuda()
-	RL_train(net)
+	test_run(net)
 
