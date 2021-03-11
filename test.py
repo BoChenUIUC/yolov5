@@ -554,7 +554,7 @@ def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
                 f"Test Iter: {batch_i+1:3}/{len(dataloader):3}. "
                 f"NT: {metric[0]:3}. CR: {cr:.2f}. "
                 f"map50: {metric[3]:.2f}s. map: {metric[4]:.2f}s. "
-                f"MP: {accuracy:.2f}s. MR: {accuracy:.2f}s. ")
+                f"MP: {metric[1]:.2f}s. MR: {metric[2]:.2f}s. ")
 
     test_iter.close()
 
