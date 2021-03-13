@@ -8,6 +8,9 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from collections import OrderedDict
 from PIL import Image
+from io import StringIO
+import pickle,sys,os
+import subprocess
 
 dataset = 'ucf101-24'
 
@@ -253,7 +256,7 @@ def tile_disturber(image, C_param):
 			counts[roi_idx,feat_idx] = c
 			feat_idx += 1
 		roi_end = time.perf_counter()
-		
+
 	# weight of different features
 	weights = C_param[:num_features] + 0.5
 	# lower and upper
@@ -302,8 +305,34 @@ def tile_disturber(image, C_param):
 	# print(img_index,feat_end-feat_start)
 	return bgr_frame,compressed_size
 
-def JPEG_disturber(image, C_param):
-	return image
+def JPEG2000(npimg,C_param):
+	comp_dir = 'compression/jpeg2000/'
+	tmp_dir = comp_dir + 'tmp/'
+	cv2.imwrite(tmp_dir+'origin.png',npimg)
+	osize = os.stat(tmp_dir+'origin.png').st_size
+	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
+	subprocess.call(comp_cmd, shell=True)
+	csize = os.stat(tmp_dir+'compressed.j2k').st_size
+	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
+	subprocess.call(decm_cmd, shell=True)
+	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
+	return lossy_image,osize,csize
+
+def JPEG(npimg,C_param):
+	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
+	osize = len(pickle.dumps(npimg, 0))
+	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
+	csize = len(pickle.dumps(lossy_image, 0))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	return lossy_image,osize,csize
+
+def PNG(npimg,C_param):
+	encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), C_param]
+	osize = len(pickle.dumps(npimg, 0))
+	result, lossy_image = cv2.imencode('.png', npimg, encode_param)
+	csize = len(pickle.dumps(lossy_image, 0))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	return lossy_image,osize,csize
 
 # define a class for transformation
 class Transformer:
@@ -312,9 +341,26 @@ class Transformer:
 		self.name = name
 
 	def transform(self, image=None, C_param=None):
-		self.original_size += image.shape[0]*image.shape[1]
-		rimage,comp_sz = tile_disturber(image, C_param)
-		self.compressed_size += comp_sz
+		# need to recover images and print examples
+		# get JPEG lib
+		if self.name == 'JPEG':
+			# 0->100
+			rimage,osize,csize = JPEG(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
+		elif self.name == 'JPEG2000':
+			rimage,osize,csize = JPEG2000(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
+		elif self.name == 'PNG':
+			# 9->0
+			rimage,osize,csize = PNG(image,C_param)
+			self.original_size += osize
+			self.compressed_size += csize
+		else:	
+			self.original_size += image.shape[0]*image.shape[1]
+			rimage,comp_sz = tile_disturber(image, C_param)
+			self.compressed_size += comp_sz
 		return rimage
 
 	def reset(self):
@@ -325,7 +371,40 @@ class Transformer:
 		assert(self.original_size>0)
 		return 1-1.0*self.compressed_size/self.original_size
 
+def test_dataloader():
+	from torchvision import datasets
+	from torchvision import transforms
+	from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
+	transform_val = transforms.Compose([transforms.ToTensor(),])
+	test_dataset = datasets.CIFAR10('.././data', train=True, 
+					transform=transform_val, download=False)
+	test_loader = DataLoader(test_dataset,
+					sampler=SequentialSampler(test_dataset),
+					batch_size=64,
+					num_workers=4)
+	with torch.no_grad():
+		for step, (images, targets) in enumerate(test_loader):
+			for th_img,target in zip(images,targets):
+				npimg = (th_img.permute(1,2,0).numpy()*255).astype(np.uint8)
+				pngimg,pngosize,pngcsize = PNG(npimg,5)
+				print(pngosize,pngcsize)
+				jpegimg,jpegosize,jpegcsize = JPEG(npimg,50)
+				print(jpegosize,jpegcsize)
+				jp2img,jp2isize,jp2csize = JPEG2000(npimg,0)
+				print(jp2isize,jp2csize)
+
+				cv2.imwrite('0.png',npimg)
+				cv2.imwrite('1.png',pngimg)
+				cv2.imwrite('2.png',jpegimg)
+				cv2.imwrite('3.png',jp2img)
+				exit(0)
+
 if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
-    img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
-    analyzer(img)
+    # img = cv2.imread('/home/bo/research/dataset/ucf24/rgb-images/Basketball/v_Basketball_g01_c01/00001.jpg')
+    # analyzer(img)
+    # _,osize,csize = JPEG(img,0)
+    # PNG(img,9)
+    # _,osize,csize = JPEG2000(img,100)
+    # print(osize,csize)
+    test_dataloader()
