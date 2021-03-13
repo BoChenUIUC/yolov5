@@ -601,8 +601,9 @@ def setup_opt():
     return opt
 
 class Simulator:
-    def __init__(self):
+    def __init__(self,train=True):
         self.opt = setup_opt()
+        self.opt.task = 'train' if train else 'val'
         self.model = get_model(self.opt)
         self.dataloader,self.nc = get_dataloader(self.opt,self.model)
         self.num_batches = len(self.dataloader)
