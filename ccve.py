@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from test import Simulator
+from yolov5 import Simulator
 import mobopt as mo
 # MOO
 from pymoo.algorithms.nsga2 import NSGA2
@@ -212,7 +212,7 @@ class ParetoFront:
 		return new_state
 
 class C_Generator:
-	def __init__(self,name='CCVE',explore=True):
+	def __init__(self,name='RL',explore=True):
 		MAX_BUFFER = 1000000
 		S_DIM = 12
 		A_DIM = 6
@@ -225,7 +225,7 @@ class C_Generator:
 		self.explore = explore
 
 	def get(self):
-		if self.name == 'CCVE':
+		if self.name == 'RL':
 			self.action = self._DDPG_action()
 		else:
 			self.action = self._RE_action()
@@ -245,7 +245,7 @@ class C_Generator:
 		return np.random.random(6)-0.5
 
 	def optimize(self, datapoint, done):
-		if self.name == 'CCVE':
+		if self.name == 'RL':
 			self._DDPG_optimize(datapoint, done)
 		elif self.name == 'RE':
 			self.paretoFront.add(self.action, datapoint)
@@ -288,6 +288,7 @@ def pareto_front_approx_nsga2():
 				print('Iter:',self.iter)
 				self.iter += 1
 			out["F"] = np.array(points)
+	start = time.perf_counter()
 
 	problem = MyProblem()
 
@@ -298,14 +299,14 @@ def pareto_front_approx_nsga2():
 					('n_gen', 50),
 					seed=1,
 					verbose=False)
-
-	# plot = Scatter()
-	# plot.add(problem.pareto_front(), plot_type="line", color="black", alpha=0.7)
-	# plot.add(res.F, color="red")
-	# plot.show()
+    
+	end = time.perf_counter()
+	with open('NSGA_time.log','w',1) as f:
+		f.write(str(end-start)+'s')
 
 # PFA using MOBO
 def pareto_front_approx_mobo():
+	start = time.perf_counter()
 	d = {}
 	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
 	d['acc_file'] = open('MOBO_acc.log', "w", 1)
@@ -327,6 +328,9 @@ def pareto_front_approx_mobo():
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=1000)
+	end = time.perf_counter()
+	with open('MOBO_time.log','w',1) as f:
+		f.write(str(end-start)+'s')
 
 # PFA
 def pareto_front_approx():
@@ -363,7 +367,7 @@ def pareto_front_approx():
 		cr_file.write(str(cr)+'\n')
 	# test wigh 500 iter
 	end = time.perf_counter()
-	with open('time.log','w',1) as f:
+	with open(EXP_NAME+'_time.log','w',1) as f:
 		f.write(str(end-start)+'s')
 
 # input: pf file/JPEG/JPEG2000
