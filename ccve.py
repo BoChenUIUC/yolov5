@@ -333,8 +333,7 @@ def pareto_front_approx_mobo():
 		f.write(str(end-start)+'s')
 
 # PFA
-def pareto_front_approx():
-	EXP_NAME = 'RL'
+def pareto_front_approx(EXP_NAME):
 	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
 	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
 	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
@@ -376,7 +375,7 @@ def evaluation(EXP_NAME):
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	sim = Simulator()
+	sim = Simulator(train=False)
 	TF = Transformer(name=EXP_NAME)
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
@@ -426,6 +425,22 @@ def test_run():
 		cfg_file.write(' '.join([str(n) for n in C_param])+'\n')
 		acc_file.write(' '.join([str(n) for n in map50s])+'\n')
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
+
+def generate_image_samples(EXP_NAME):
+	sim = Simulator(train=False)
+	TF = Transformer(name=EXP_NAME,snapshot=True)
+	datarange = [40,41]#sim.num_batches]
+	selected_lines = [50,110]
+	# replace pf file later
+	with open('MOBO_pf.log','r') as f:
+		for lcnt,line in enumerate(f.readlines()):
+			if lcnt not in selected_lines:
+				continue
+			tmp = line.strip().split(' ')
+			acc,cr = float(tmp[0]),float(tmp[1])
+			C_param = np.array([float(n) for n in tmp[2:]])
+			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+			break
 
 def dual_train(net):
 	np.random.seed(123)
@@ -500,16 +515,13 @@ def dual_train(net):
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
-	# prepare network
-	# net = RSNet()
-	# net.load_state_dict(torch.load('backup/rsnet.pth'))
-	# net = net.cuda()
 
 	# determine lenght of episode
 	# test_run()
 
 	# use ddpg or re for approx
-	pareto_front_approx()
+	# pareto_front_approx("RL")
+	pareto_front_approx("RE")
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
@@ -523,4 +535,7 @@ if __name__ == "__main__":
 
 	# for name in ['JPEG','JPEG2000','PNG']:
 	# 	evaluation(name)
+
+	# samples for eval
+	# generate_image_samples('CCVE')
 

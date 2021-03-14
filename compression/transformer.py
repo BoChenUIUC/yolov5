@@ -11,6 +11,8 @@ from PIL import Image
 from io import StringIO
 import pickle,sys,os
 import subprocess
+import matplotlib.pyplot as plt
+import matplotlib
 
 dataset = 'ucf101-24'
 
@@ -211,16 +213,87 @@ class LRU(OrderedDict):
 			oldest = next(iter(self))
 			del self[oldest]
 
-def tile_disturber(image, C_param):
+def heatmap(data, row_labels, col_labels, ax=None,
+			cbar_kw={}, cbarlabel="", **kwargs):
+	if not ax:
+		ax = plt.gca()
+
+	# Plot the heatmap
+	im = ax.imshow(data, **kwargs)
+
+	# Create colorbar
+	cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+	cbar.ax.set_ylabel(cbarlabel, rotation=-90, va="bottom")
+
+	# We want to show all ticks...
+	ax.set_xticks(np.arange(data.shape[1]))
+	ax.set_yticks(np.arange(data.shape[0]))
+	# ... and label them with the respective list entries.
+	ax.set_xticklabels(col_labels)
+	ax.set_yticklabels(row_labels)
+
+	# Let the horizontal axes labeling appear on top.
+	ax.tick_params(top=True, bottom=False,
+					labeltop=True, labelbottom=False)
+
+	# Rotate the tick labels and set their alignment.
+	plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",
+					rotation_mode="anchor")
+
+	# Turn spines off and create white grid.
+	for edge, spine in ax.spines.items():
+		spine.set_visible(False)
+
+	ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+	ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+	ax.grid(which="minor", color="w", linestyle='-', linewidth=3)
+	ax.tick_params(which="minor", bottom=False, left=False)
+
+	return im, cbar
+
+def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
+					 textcolors=("black", "white"),
+					 threshold=None, **textkw):
+
+	if not isinstance(data, (list, np.ndarray)):
+		data = im.get_array()
+
+	# Normalize the threshold to the images color range.
+	if threshold is not None:
+		threshold = im.norm(threshold)
+	else:
+		threshold = im.norm(data.max())/2.
+
+	# Set default alignment to center, but allow it to be
+	# overwritten by textkw.
+	kw = dict(horizontalalignment="center",
+			verticalalignment="center")
+	kw.update(textkw)
+
+	# Get the formatter in case a string is supplied
+	if isinstance(valfmt, str):
+		valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+	# Loop over the data and create a `Text` for each "pixel".
+	# Change the text's color depending on the data.
+	texts = []
+	for i in range(data.shape[0]):
+		for j in range(data.shape[1]):
+			kw.update(color=textcolors[int(im.norm(data[i, j]) > threshold)])
+			text = im.axes.text(j, i, valfmt(data[i, j], None), **kw)
+			texts.append(text)
+
+	return texts
+
+def tile_disturber(image, C_param, counter, snapshot=False):
+	toSave = snapshot and counter<5
 	# analyze features in image
 	feat_start = time.perf_counter()
 	bgr_frame = np.array(image)
-	# edge diff
-	# edge, _ = get_edge_feature(bgr_frame)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_origin.jpg',bgr_frame)
 	# harris corner
 	hc, _ = get_harris_corner(bgr_frame)
-	# # GFTT
-	# gftt, _ = get_GFTT(bgr_frame)
 	# FAST
 	fast, _ = get_FAST(bgr_frame)
 	# STAR
@@ -232,6 +305,14 @@ def tile_disturber(image, C_param):
 	point_features = [fast, star, orb]
 	map_features = []
 	num_features = len(point_features) + len(map_features)
+	# snapshot features optionally
+	if toSave:
+		feature_frame = np.zeros(bgr_frame.shape)
+		colors = [(72, 31, 219),(112, 70, 28),(168, 182, 33)]
+		for points,color in zip(point_features,colors):
+			for px,py in points:
+				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
+		cv2.imwrite(f'samples/{counter:2}_feature.jpg',feature_frame)
 	# divide image to 4*3 tiles
 	ROIs = []
 	num_w, num_h = 4,3
@@ -274,6 +355,20 @@ def tile_disturber(image, C_param):
 	weighted_scores = np.matmul(normalized_score,weights)
 	# the weight is more valuable when its value is higher
 	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(num_h,num_w))
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(num_h)],
+						 [str(i) for i in range(num_w)], ax=ax,
+		                   cmap="coolwarm", cbarlabel="Down-sampling rate")
+		texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:2}_heatmap.jpg')
 
 	tile_sizes = [(int(np.rint((x2-x1)*r)),int(np.rint((y2-y1)*r))) for r,(x1,y1,x2,y2) in zip(quality,ROIs)]
 
@@ -302,7 +397,8 @@ def tile_disturber(image, C_param):
 			bgr_frame[y1:y2,x1:x2] = crop
 
 	feat_end = time.perf_counter()
-	# print(img_index,feat_end-feat_start)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
 	return bgr_frame,compressed_size
 
 def JPEG2000(npimg,C_param):
@@ -336,9 +432,10 @@ def PNG(npimg,C_param):
 
 # define a class for transformation
 class Transformer:
-	def __init__(self,name):
+	def __init__(self,name,snapshot = False):
 		# need a dict as buffer to store transformed image of a range
 		self.name = name
+		self.snapshot = snapshot
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
@@ -359,13 +456,15 @@ class Transformer:
 			self.compressed_size += csize
 		else:	
 			self.original_size += image.shape[0]*image.shape[1]
-			rimage,comp_sz = tile_disturber(image, C_param)
+			rimage,comp_sz = tile_disturber(image, C_param, self.counter, self.snapshot)
 			self.compressed_size += comp_sz
+		self.counter += 1
 		return rimage
 
 	def reset(self):
 		self.compressed_size = 0
 		self.original_size = 0
+		self.counter = 0
 
 	def get_compression_ratio(self):
 		assert(self.original_size>0)
