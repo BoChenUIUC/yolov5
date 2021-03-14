@@ -529,9 +529,9 @@ if __name__ == "__main__":
 	# compute coverage, maybe also hypervolume?
 	# comparePF(1000)
 
-	pareto_front_approx_mobo()
+	# pareto_front_approx_mobo()
 
-	# pareto_front_approx_nsga2()
+	pareto_front_approx_nsga2()
 
 	# for name in ['JPEG','JPEG2000','PNG']:
 	# 	evaluation(name)
