@@ -521,7 +521,7 @@ if __name__ == "__main__":
 
 	# use ddpg or re for approx
 	# pareto_front_approx("RL")
-	pareto_front_approx("RE")
+	# pareto_front_approx("RE")
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
@@ -529,7 +529,7 @@ if __name__ == "__main__":
 	# compute coverage, maybe also hypervolume?
 	# comparePF(1000)
 
-	# pareto_front_approx_mobo()
+	pareto_front_approx_mobo()
 
 	# pareto_front_approx_nsga2()
 
