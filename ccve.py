@@ -312,7 +312,7 @@ def pareto_front_approx_nsga2(comp_name):
 		f.write(str(end-start)+'s')
 
 # PFA using MOBO
-def pareto_front_approx_mobo(comp_name):
+def pareto_front_approx_mobo(comp_name,max_iter=1000):
 	start = time.perf_counter()
 	d = {}
 	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
@@ -323,18 +323,18 @@ def pareto_front_approx_mobo(comp_name):
 		sim = Simulator(train=True)
 		TF = Transformer(comp_name)
 		datarange = [0,100]
+		print('Iter:',d['iter'],x)
 		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
 		d['acc_file'].write(str(float(acc))+'\n')
 		d['cr_file'].write(str(cr)+'\n')
-		print('Iter:',d['iter'])
 		d['iter'] += 1
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
 		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
-	front, pop = Optimizer.maximize(n_iter=1000)
+	front, pop = Optimizer.maximize(n_iter=max_iter)
 	end = time.perf_counter()
 	with open('MOBO_time.log','w',1) as f:
 		f.write(str(end-start)+'s')
@@ -565,13 +565,14 @@ if __name__ == "__main__":
 
 	# 2. find out best optimizer
 	# pareto_front_approx('Tiled',"RL")
-	pareto_front_approx('Tiled',"RE")
+	# pareto_front_approx('Tiled',"RE")
 	# pareto_front_approx_mobo('Tiled')
 	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
-	# for comp_name in['Tiled','TiledWebP','TiledJPEG']:
-	# 	pareto_front_approx_mobo(comp_name)
+	# change iters to 500
+	for comp_name in['Tiled','TiledWebP','TiledJPEG']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)

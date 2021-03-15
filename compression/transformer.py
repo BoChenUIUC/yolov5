@@ -359,11 +359,11 @@ def tile_encoder(image, C_param, counter, snapshot=False):
 			compressed_size += (x2-x1)*(y2-y1)
 			continue
 		crop = bgr_frame[y1:y2,x1:x2].copy()
+		original_size += len(pickle.dumps(crop, 0))
 		if dsize[0]==0 or dsize[1]==0:
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
 			try:
-				original_size += len(pickle.dumps(crop, 0))
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
 				compressed_size += len(pickle.dumps(crop_d, 0))
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
