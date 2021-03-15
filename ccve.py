@@ -565,9 +565,9 @@ if __name__ == "__main__":
 
 	# 2. find out best optimizer
 	# pareto_front_approx('Tiled',"RL")
-	# pareto_front_approx('Tiled',"RE")
+	pareto_front_approx('Tiled',"RE")
 	# pareto_front_approx_mobo('Tiled')
-	pareto_front_approx_nsga2('Tiled')
+	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# for comp_name in['Tiled','TiledWebP','TiledJPEG']:
