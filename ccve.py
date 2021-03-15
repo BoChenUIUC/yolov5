@@ -272,6 +272,7 @@ class C_Generator:
 
 # NAGA2
 def pareto_front_approx_nsga2(comp_name):
+	print(comp_name,'NSGA II')
 	class MyProblem(Problem):
 		def __init__(self):
 			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
