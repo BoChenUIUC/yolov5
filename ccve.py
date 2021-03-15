@@ -97,7 +97,6 @@ class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
 		self.reset()
-		self.pf_file = open(name+'_pf.log', "w", 1)
 
 	def reset(self):
 		print('Reset environment.')
@@ -155,7 +154,7 @@ class ParetoFront:
 		if add_new:
 			self.dominating_c_param += c_param
 			self.dominating_cnt += 1
-			angle = np.arctan(dp[1]/dp[0])
+			angle = dp[1]
 			# pre_score = self.uniformity()
 			self.data[dp] = (angle,c_param)
 			# cur_score = self.uniformity()
@@ -200,6 +199,7 @@ class ParetoFront:
 		return area
 
 	def save(self):
+		self.pf_file = open(name+'_pf.log', "w", 1)
 		for k in self.data:
 			if k in [(0,1),(1,0)]:continue
 			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
@@ -227,8 +227,11 @@ class C_Generator:
 	def get(self):
 		if self.name == 'RL':
 			self.action = self._DDPG_action()
-		else:
+		elif self.name == 'RE':
 			self.action = self._RE_action()
+		else:
+			print(self.name,'not implemented.')
+			exit(1)
 		return self.action
 
 	def _DDPG_action(self):
@@ -249,6 +252,9 @@ class C_Generator:
 			self._DDPG_optimize(datapoint, done)
 		elif self.name == 'RE':
 			self.paretoFront.add(self.action, datapoint)
+		else:
+			print(self.name,'not implemented.')
+			exit(1)
 
 	def _DDPG_optimize(self, datapoint, done):
 		# if one episode ends, do nothing
@@ -265,16 +271,16 @@ class C_Generator:
 			self.paretoFront.reset()
 
 # NAGA2
-def pareto_front_approx_nsga2():
+def pareto_front_approx_nsga2(comp_name):
 	class MyProblem(Problem):
 		def __init__(self):
 			super().__init__(n_var=6, n_obj=2, n_constr=0, xl=np.array([-.5]*6), xu=np.array([.5]*6))
 			self.sim = Simulator(train=True)
-			self.TF = Transformer('compression')
+			self.TF = Transformer(comp_name)
 			self.datarange = [0,100]
-			self.cfg_file = open('NSGA2_cfg.log', "w", 1)
-			self.acc_file = open('NSGA2_acc.log', "w", 1)
-			self.cr_file = open('NSGA2_cr.log', "w", 1)
+			self.cfg_file = open(comp_name+'_NSGA2_cfg.log', "w", 1)
+			self.acc_file = open(comp_name+'_NSGA2_acc.log', "w", 1)
+			self.cr_file = open(comp_name+'_NSGA2_cr.log', "w", 1)
 			self.iter = 0
 
 		def _evaluate(self, x, out, *args, **kwargs):
@@ -305,16 +311,16 @@ def pareto_front_approx_nsga2():
 		f.write(str(end-start)+'s')
 
 # PFA using MOBO
-def pareto_front_approx_mobo():
+def pareto_front_approx_mobo(comp_name):
 	start = time.perf_counter()
 	d = {}
-	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
-	d['acc_file'] = open('MOBO_acc.log', "w", 1)
-	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
+	d['acc_file'] = open(comp_name+'_'+'MOBO_acc.log', "w", 1)
+	d['cr_file'] = open(comp_name+'_'+'MOBO_cr.log', "w", 1)
 	d['iter'] = 0
 	def objective(x):
 		sim = Simulator(train=True)
-		TF = Transformer('compression')
+		TF = Transformer(comp_name)
 		datarange = [0,100]
 		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
@@ -333,10 +339,10 @@ def pareto_front_approx_mobo():
 		f.write(str(end-start)+'s')
 
 # PFA
-def pareto_front_approx(EXP_NAME):
-	cfg_file = open(EXP_NAME+'_cfg.log', "w", 1)
-	acc_file = open(EXP_NAME+'_acc.log', "w", 1)
-	cr_file = open(EXP_NAME+'_cr.log', "w", 1)
+def pareto_front_approx(comp_name,EXP_NAME):
+	cfg_file = open(comp_name+'_'+EXP_NAME+'_cfg.log', "w", 1)
+	acc_file = open(comp_name+'_'+EXP_NAME+'_acc.log', "w", 1)
+	cr_file = open(comp_name+'_'+EXP_NAME+'_cr.log', "w", 1)
 
 	# test wigh 500 iter
 	start = time.perf_counter()
@@ -349,7 +355,7 @@ def pareto_front_approx(EXP_NAME):
 	datarange = [0,100]
 	print(EXP_NAME,'num configs:',num_cfg, 'total batches:', sim.num_batches)
 
-	TF = Transformer('compression')
+	TF = Transformer(comp_name)
 	# the pareto front can be restarted, need to try
 
 	for bi in range(num_cfg):
@@ -380,20 +386,47 @@ def evaluation(EXP_NAME):
 	datarange = [0,sim.num_batches]
 	eval_file = open(EXP_NAME+'_eval.log', "w", 1)
 
-	if EXP_NAME == 'CCVE':
-		with open('MOBO_pf.log','r') as f:
+	if EXP_NAME in ['Tiled', 'TiledWebP', 'TiledJPEG']:
+		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
 			for line in f.readlines():
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-				eval_file.write("{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+				eval_file.write("f{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
-		K = 10 if EXP_NAME == 'PNG' else 101
-		for i in range(K):
+		for i in range(101):
 			print(EXP_NAME,i)
-			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=K)
-			eval_file.write("{acc:.3f} {cr:.3f}\n")
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
+			eval_file.write("f{acc:.3f} {cr:.3f}\n")
+			if EXP_NAME=='JPEG2000' and i==5:break
+
+def speed_test(EXP_NAME):
+	np.random.seed(123)
+	torch.manual_seed(2)
+
+	sim = Simulator(train=False)
+	TF = Transformer(name=EXP_NAME)
+	datarange = [66,70]
+	selected_ranges = [17,35,57,77,129]
+	eval_file = open(EXP_NAME+'_spdtest.log', "w", 1)
+
+	if EXP_NAME == 'CCVE':
+		with open('MOBO_pf.log','r') as f:
+			for lidx,line in enumerate(f.readlines()):
+				if lidx not in selected_ranges:continue
+				tmp = line.strip().split(' ')
+				acc,cr = float(tmp[0]),float(tmp[1])
+				C_param = np.array([float(n) for n in tmp[2:]])
+				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+	else:
+		rate_ranges = [5,12,23,56,100] if EXP_NAME=='JPEG' else [0,1,2,3,4,5]
+		for r in rate_ranges:
+			print(EXP_NAME,r)
+			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=r)
+		print(TF.get_compression_time())
+	m,s = TF.get_compression_time()
+	eval_file.write(f"{m:.3f} {s:.3f}\n")
 
 # determine sample size
 def test_run():
@@ -411,7 +444,7 @@ def test_run():
 	selected_ranges = [10*i for i in range(1,10)]+[100*i for i in range(1,8)]+[782]
 	print('Num batches:',num_cfg,sim.num_batches)
 
-	TF = Transformer('compression')
+	TF = Transformer('Tiled')
 	# the pareto front can be restarted, need to try
 
 	for bi in range(num_cfg):
@@ -428,8 +461,8 @@ def test_run():
 
 def generate_image_samples(EXP_NAME):
 	sim = Simulator(train=False)
-	TF = Transformer(name=EXP_NAME,snapshot=True)
-	datarange = [40,41]#sim.num_batches]
+	TF = Transformer(name=EXP_NAME,snapshot=False)
+	datarange = [0,1]#sim.num_batches]
 	selected_lines = [50,110]
 	# replace pf file later
 	with open('MOBO_pf.log','r') as f:
@@ -440,7 +473,10 @@ def generate_image_samples(EXP_NAME):
 			acc,cr = float(tmp[0]),float(tmp[1])
 			C_param = np.array([float(n) for n in tmp[2:]])
 			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
+			print(acc1,cr1)
 			break
+	m,s = TF.get_compression_time()
+	print(m,s)
 
 def dual_train(net):
 	np.random.seed(123)
@@ -458,7 +494,7 @@ def dual_train(net):
 
 	for epoch in range(10):
 		running_loss = 0.0
-		TF = Transformer('compression')
+		TF = Transformer('Tiled')
 		# the pareto front can be restarted, need to try
 
 		for bi in range(num_cfg):
@@ -516,26 +552,34 @@ if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
-	# determine lenght of episode
+	# samples for eval
+	# generate_image_samples('TiledWebP')
+
+	# speed test
+	# for name in ['CCVE','JPEG','JPEG2000']:
+	# 	speed_test(name)
+
+	# 1. determine lenght of episode
 	# test_run()
 
-	# use ddpg or re for approx
-	# pareto_front_approx("RL")
-	# pareto_front_approx("RE")
+	# 2. find out best optimizer
+	# pareto_front_approx('Tiled',"RL")
+	# pareto_front_approx('Tiled',"RE")
+	# pareto_front_approx_mobo('Tiled')
+	pareto_front_approx_nsga2('Tiled')
+
+	# profiling for Tiled, TiledWebP, TiledJPEG
+	# for comp_name in['Tiled','TiledWebP','TiledJPEG']:
+	# 	pareto_front_approx_mobo(comp_name)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
 
-	# compute coverage, maybe also hypervolume?
+	# compute eval metrics
 	# comparePF(1000)
 
-	# pareto_front_approx_mobo()
-
-	pareto_front_approx_nsga2()
-
-	# for name in ['JPEG','JPEG2000','PNG']:
+	# leave jpeg2000 for later
+	# former two can be evaluated directly without profile
+	# for name in ['JPEG','WebP','Tiled','TiledWebP','TiledJPEG']:
 	# 	evaluation(name)
-
-	# samples for eval
-	# generate_image_samples('CCVE')
 
