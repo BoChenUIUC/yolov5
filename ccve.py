@@ -394,12 +394,12 @@ def evaluation(EXP_NAME):
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-				eval_file.write("f{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
-			eval_file.write("f{acc:.3f} {cr:.3f}\n")
+			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 			if EXP_NAME=='JPEG2000' and i==5:break
 
 def speed_test(EXP_NAME):
@@ -571,8 +571,8 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	for comp_name in['Tiled']:
-		pareto_front_approx_mobo(comp_name,450)
+	# for comp_name in['Tiled']:
+	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
 	# configs2paretofront('MOBO',500)
@@ -582,7 +582,7 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['JPEG','WebP','Tiled']:
-	# 	evaluation(name)
+	for name in ['JPEG','WebP']:
+		evaluation(name)
 
  
