@@ -294,7 +294,6 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 		cv2.imwrite(f'samples/{counter:2}_feature.jpg',feature_frame)
 	
 	# divide image to 4*3 tiles
-	ROIs = []
 	img_h,img_w = bgr_frame.shape[:2]
 	block_w,block_h = 16,8
 	# compute block height/width
@@ -304,10 +303,6 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start_cnt = time.perf_counter()
 	gridx = [i for i in range(0,img_w,block_w)] + [img_w]
 	gridy = [i for i in range(0,img_h,block_h)] + [img_h]
-	for row in range(heightInBlock):
-		for col in range(widthInBlock):
-			x1 = col*block_w; x2 = min((col+1)*block_w,img_w); y1 = row*block_h; y2 = min((row+1)*block_h,img_h)
-			ROIs.append([x1,y1,x2,y2])
 	counts = np.zeros((widthInBlock*heightInBlock,num_features))
 	for feat_idx, features in enumerate(point_features):
 		feature_x = [p[0] for p in features]
@@ -374,6 +369,25 @@ def JPEG2000(npimg,C_param):
 	csize = os.stat(tmp_dir+'compressed.j2k').st_size
 	return lossy_image,osize,csize,end-start
 
+def TUBBOJPEG(npimg,C_param,jpeg):
+	bgr_frame = np.ascontiguousarray(npimg)
+	start = time.perf_counter()
+	# divide image to 4*3 tiles
+	img_h,img_w = bgr_frame.shape[:2]
+	block_w,block_h = 16,8
+	# compute block height/width
+	heightInBlock = int(img_h/block_h) if img_h%block_h==0 else (int(img_h/block_h) + 1)
+	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
+	q = max(C_param,1)
+	q = min(C_param,100)
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*90
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	compressed_size = len(jpegraw)
+	end = time.perf_counter()
+	lossy_image = jpeg.decode(jpegraw,feature_encoding)
+	return lossy_image,osize,csize,end-start
+
 def JPEG(npimg,C_param):
 	start = time.perf_counter()
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
@@ -409,7 +423,7 @@ class Transformer:
 		# get JPEG lib
 		if self.name == 'JPEG':
 			# 0->100
-			rimage,osize,csize,t = JPEG(image,C_param)
+			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
 		elif self.name == 'JPEG2000':
 			rimage,osize,csize,t = JPEG2000(image,C_param)
 		elif self.name == 'WebP':
