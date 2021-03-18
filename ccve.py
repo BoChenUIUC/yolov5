@@ -97,6 +97,7 @@ class ParetoFront:
 	def __init__(self,name='RE',stopping_criterion=100):
 		self.stopping_criterion = stopping_criterion
 		self.reset()
+		self.name = name
 
 	def reset(self):
 		print('Reset environment.')
@@ -199,7 +200,7 @@ class ParetoFront:
 		return area
 
 	def save(self):
-		self.pf_file = open(name+'_pf.log', "w", 1)
+		self.pf_file = open(self.name+'_pf.log', "w", 1)
 		for k in self.data:
 			if k in [(0,1),(1,0)]:continue
 			self.pf_file.write(str(float(k[0]))+' '+str(k[1])+' '+' '.join([str(n) for n in self.data[k][1]])+'\n')
@@ -461,10 +462,10 @@ def test_run():
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
 
 def generate_image_samples(EXP_NAME):
-	sim = Simulator(train=False)
-	TF = Transformer(name=EXP_NAME,snapshot=False)
+	sim = Simulator(train=True)
+	TF = Transformer(name=EXP_NAME,snapshot=True)
 	datarange = [0,1]#sim.num_batches]
-	selected_lines = [50,110]
+	selected_lines = [60,130]
 	# replace pf file later
 	with open('MOBO_pf.log','r') as f:
 		for lcnt,line in enumerate(f.readlines()):
@@ -474,7 +475,7 @@ def generate_image_samples(EXP_NAME):
 			acc,cr = float(tmp[0]),float(tmp[1])
 			C_param = np.array([float(n) for n in tmp[2:]])
 			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-			print(acc1,cr1)
+			print(acc1,cr1,C_param)
 			break
 	m,s = TF.get_compression_time()
 	print(m,s)
@@ -554,7 +555,7 @@ if __name__ == "__main__":
 	torch.manual_seed(2)
 
 	# samples for eval
-	# generate_image_samples('TiledWebP')
+	# generate_image_samples('Tiled')
 
 	# speed test
 	# for name in ['CCVE','JPEG','JPEG2000']:
@@ -571,18 +572,18 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	# for comp_name in['Tiled']:
-	# 	pareto_front_approx_mobo(comp_name,450)
+	for comp_name in['Tiled']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('MOBO',500)
+	# configs2paretofront('Tiled_MOBO',500)
 
 	# compute eval metrics
 	# comparePF(1000)
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['JPEG','WebP']:
-		evaluation(name)
+	# for name in ['JPEG','WebP']:
+	# 	evaluation(name)
 
  
