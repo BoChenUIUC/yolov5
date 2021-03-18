@@ -380,10 +380,10 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
 	q = max(C_param,1)
 	q = min(C_param,100)
-	original_size = len(pickle.dumps(bgr_frame, 0))
+	osize = len(pickle.dumps(bgr_frame, 0))
 	feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*90
 	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
-	compressed_size = len(jpegraw)
+	csize = len(jpegraw)
 	end = time.perf_counter()
 	lossy_image = jpeg.decode(jpegraw,feature_encoding)
 	return lossy_image,osize,csize,end-start
