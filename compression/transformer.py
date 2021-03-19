@@ -531,12 +531,12 @@ class Transformer:
 		self.snapshot = snapshot
 		self.counter = 0
 		self.time = []
-		self.jpeg = TurboJPEG()
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
+			self.jpeg = TurboJPEG()
 			# 0->100
 			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
 		elif self.name == 'JPEG2000':
@@ -547,6 +547,7 @@ class Transformer:
 		elif self.name == 'TiledLegacy':
 			rimage,osize,csize,t = tile_legacy(image, C_param, self.counter, self.snapshot)
 		elif self.name == 'Tiled':	
+			self.jpeg = TurboJPEG()
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
 		else:
 			print(self.name,'not implemented.')
