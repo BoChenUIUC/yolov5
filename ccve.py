@@ -583,7 +583,7 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['JPEG2000']:
+	for name in ['TiledLegacy']:
 		evaluation(name)
 
  
