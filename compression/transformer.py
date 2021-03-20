@@ -481,6 +481,7 @@ def JPEG2000(npimg,C_param):
 	end = time.perf_counter()
 	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
 	assert(lossy_image is not None)
+	lossy_image = cv2.resize(lossy_image, dsize=(npimg.shape[1],npimg.shape[0]), interpolation=cv2.INTER_LINEAR)
 	csize = os.stat(tmp_dir+'compressed.j2k').st_size
 	return lossy_image,osize,csize,end-start
 

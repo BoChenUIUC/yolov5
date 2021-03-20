@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from threading import Thread
+import traceback
 
 import numpy as np
 import torch
@@ -353,7 +354,12 @@ def run_model(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
         with torch.no_grad():
             # Run model
             t = time_synchronized()
-            out, train_out = model(img, augment=opt.augment)  # inference and training outputs
+            try:
+                out, train_out = model(img, augment=opt.augment)  # inference and training outputs
+            except Exception as e:
+                print(traceback.format_exc())
+                print(batch_i,img.shape,C_param)
+            
             t0 += time_synchronized() - t
 
             # Run NMS

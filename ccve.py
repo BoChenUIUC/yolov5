@@ -10,7 +10,7 @@ from compression.ddpgtrain import Trainer
 from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
-from yolov5 import Simulator
+from app import Simulator
 import mobopt as mo
 # MOO
 from pymoo.algorithms.nsga2 import NSGA2
@@ -396,12 +396,15 @@ def evaluation(EXP_NAME):
 				C_param = np.array([float(n) for n in tmp[2:]])
 				acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 				eval_file.write(f"{acc1:.3f} {cr1:.3f} {acc:.3f} {cr:.3f}\n")
+	elif EXP_NAME == 'RAW':
+		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
+		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
-			if EXP_NAME=='JPEG2000' and i==5:break
+			# if EXP_NAME=='JPEG2000' and i==5:break
 
 def speed_test(EXP_NAME):
 	np.random.seed(123)
@@ -575,15 +578,15 @@ if __name__ == "__main__":
 	# for comp_name in['Tiled']:
 	# 	pareto_front_approx_mobo(comp_name,450)
 
-	# convert from .log file to pf for eval
-	# configs2paretofront('Tiled_MOBO',500)
-
 	# compute eval metrics
 	# comparePF(500)
 
+	# convert from .log file to pf for eval
+	configs2paretofront('Tiled_MOBO',500)
+
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['JPEG2000']:
+	for name in ['Tiled']:
 		evaluation(name)
 
  
