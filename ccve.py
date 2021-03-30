@@ -263,7 +263,7 @@ class C_Generator:
 		return action
 
 	def _RE_action(self):
-		return np.random.random(6)-0.5
+		return np.random.random(7)-0.5
 
 	def optimize(self, datapoint, done):
 		if self.name == 'RL':
@@ -350,7 +350,7 @@ def pareto_front_approx_mobo(comp_name,max_iter=1000):
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
-		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
+		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 	end = time.perf_counter()
@@ -492,7 +492,7 @@ def test_run():
 def generate_image_samples(EXP_NAME):
 	sim = Simulator(train=True)
 	TF = Transformer(name=EXP_NAME,snapshot=True)
-	datarange = [60,61]#sim.num_batches]
+	datarange = [0,1]#sim.num_batches]
 	selected_lines = [83,144]
 	# replace pf file later
 	with open(EXP_NAME+'_MOBO_pf.log','r') as f:
@@ -501,7 +501,8 @@ def generate_image_samples(EXP_NAME):
 				continue
 			tmp = line.strip().split(' ')
 			acc,cr = float(tmp[0]),float(tmp[1])
-			C_param = np.array([float(n) for n in tmp[2:]])
+			# C_param = np.array([float(n) for n in tmp[2:]])
+			C_param = np.array([0,0,0,-.5,.5,0,-0.2])
 			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
 			print(acc1,cr1,C_param)
 			break
@@ -594,14 +595,14 @@ if __name__ == "__main__":
 
 	# 2. find out best optimizer
 	# pareto_front_approx('Tiled',"RL")
-	pareto_front_approx('Tiled',"RE")
+	# pareto_front_approx('Tiled',"RE")
 	# pareto_front_approx_mobo('Tiled')
-	pareto_front_approx_nsga2('Tiled')
+	# pareto_front_approx_nsga2('Tiled')
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	# for comp_name in['Tiled']:
-	# 	pareto_front_approx_mobo(comp_name,450)
+	for comp_name in['Tiled']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)

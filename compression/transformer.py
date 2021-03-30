@@ -382,7 +382,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start = time.perf_counter()
-	toSave = snapshot and counter<16
+	toSave = snapshot and counter<5
 	# analyze features in image
 	bgr_frame = np.array(image)
 	bgr_frame = np.ascontiguousarray(bgr_frame)
@@ -408,22 +408,32 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
 		cv2.imwrite(f'samples/{counter:02}_feature.jpg',feature_frame)
 	
-	# divide image to 4*3 tiles
+
+	# whether to scale the tile
+	scaler = 1
+	assert(len(C_param)==num_features+4)
+	if len(C_param)>num_features+3:
+		scaler = int(((C_param[num_features+3]+0.5)*10)) + 1
+		scaler = min(scaler,10); scaler = max(scaler,1)
+	# divide image to tiles
 	img_h,img_w = bgr_frame.shape[:2]
 	block_w,block_h = 16,8
+	tile_w,tile_h = 16*scaler,8*scaler
 	# compute block height/width
 	heightInBlock = int(img_h/block_h) if img_h%block_h==0 else (int(img_h/block_h) + 1)
 	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
+	heightInTile = int(img_h/tile_h) if img_h%tile_h==0 else (int(img_h/tile_h) + 1)
+	widthInTile = int(img_w/tile_w) if img_w%tile_w==0 else (int(img_w/tile_w) + 1)
 	# count features in each block
 	start_cnt = time.perf_counter()
-	gridx = [i for i in range(0,img_w,block_w)] + [img_w]
-	gridy = [i for i in range(0,img_h,block_h)] + [img_h]
-	counts = np.zeros((widthInBlock*heightInBlock,num_features))
+	gridx = [i for i in range(0,img_w,tile_w)] + [img_w]
+	gridy = [i for i in range(0,img_h,tile_h)] + [img_h]
+	counts = np.zeros((widthInTile*heightInTile,num_features))
 	for feat_idx, features in enumerate(point_features):
 		feature_x = [p[0] for p in features]
 		feature_y = [p[1] for p in features]
 		grid, _, _ = np.histogram2d(feature_x, feature_y, bins=[gridx, gridy])
-		counts[:,feat_idx] = np.reshape(grid.T,(widthInBlock*heightInBlock))
+		counts[:,feat_idx] = np.reshape(grid.T,(widthInTile*heightInTile))
 
 	# weight of different features
 	weights = C_param[:num_features] + 0.5
@@ -442,6 +452,13 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	weighted_scores = np.matmul(normalized_score,weights)
 	# the weight is more valuable when its value is higher
 	quality = (upper-lower)*weighted_scores**order_choices[k] + lower
+	# convert to fit number of MBs
+	if scaler > 1:
+		quality = np.reshape(quality,(heightInTile,widthInTile))
+		quality = np.repeat(quality,scaler,axis=0)
+		quality = np.repeat(quality,scaler,axis=1)
+		quality = quality[:heightInBlock,:widthInBlock].flatten()
+
 	# generate heatmap
 	if toSave:
 		hm = np.reshape(quality,(heightInBlock,widthInBlock))
