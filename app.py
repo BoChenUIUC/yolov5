@@ -284,7 +284,7 @@ def feature_trainer(dataloader,net,half,epoch):
         optimizer.zero_grad()
 
         # forward + backward + optimize
-        outputs = net(inputs)
+        outputs = net(img)
         assert(labels.size(1) == outputs.size(1))
         loss = criterion(outputs, labels)
         loss.backward()
@@ -341,7 +341,7 @@ def feature_tester(dataloader,net,half,epoch):
 
         # forward + backward + optimize
         with torch.no_grad():
-            outputs = net(inputs) 
+            outputs = net(img) 
             loss = criterion(outputs, labels)
         
         # print statistics
