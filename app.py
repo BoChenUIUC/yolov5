@@ -250,6 +250,7 @@ def feature_trainer(dataloader,net,half,epoch):
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     train_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
+        if half: img = img.cuda()
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
@@ -274,11 +275,10 @@ def feature_trainer(dataloader,net,half,epoch):
         gt_ft_map = toMacroBlock(gt_ft_map)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
-        inputs = torch.FloatTensor(img)
-        labels = torch.FloatTensor(gt_ft_map)
         if half:
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            labels = torch.FloatTensor(gt_ft_map).cuda()
+        else:
+            labels = torch.FloatTensor(gt_ft_map)
 
         # zero gradient
         optimizer.zero_grad()
@@ -309,6 +309,7 @@ def feature_tester(dataloader,net,half,epoch):
     criterion = nn.BCELoss()
     test_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
+        if half: img = img.cuda()
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
@@ -333,11 +334,10 @@ def feature_tester(dataloader,net,half,epoch):
         gt_ft_map = toMacroBlock(gt_ft_map)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
-        inputs = torch.FloatTensor(img)
-        labels = torch.FloatTensor(gt_ft_map)
         if half:
-            inputs = inputs.cuda()
-            labels = labels.cuda()
+            labels = torch.FloatTensor(gt_ft_map).cuda()
+        else:
+            labels = torch.FloatTensor(gt_ft_map)
 
         # forward + backward + optimize
         with torch.no_grad():
