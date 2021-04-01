@@ -218,7 +218,7 @@ class TwoLayer(nn.Module):
         x = x.view(x.size(0), -1)
         x = F.tanh(x)
         x = x * 0.5 + 0.5
-        return x.clamp(0,1)
+        return x
 
 def feature_main():
     sim_train = Simulator(train=True,use_model=False)
@@ -229,7 +229,7 @@ def feature_main():
     PATH = 'backup/sf.pth'
     net = TwoLayer()
     # net.load_state_dict(torch.load(PATH))
-    if half: net = net.cuda().half()
+    if half: net = net.cuda()
     # for i in range(10):
     #     s = time.perf_counter()
     #     print(net(torch.randn(1, 3, 320, 672)).shape)
@@ -251,7 +251,7 @@ def feature_trainer(dataloader,net,half,epoch):
     train_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
         if half: img = img.cuda()
-        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img = img if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
         if half:
@@ -272,11 +272,11 @@ def feature_trainer(dataloader,net,half,epoch):
                 for x1,y1,x2,y2 in tbox:
                     x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                     gt_ft_map[si,y1:y2,x1:x2] = 1
-        gt_ft_map = toMacroBlock(gt_ft_map).clamp(0,1)
+        gt_ft_map = toMacroBlock(gt_ft_map)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
         if half:
-            labels = torch.FloatTensor(gt_ft_map).cuda().half()
+            labels = torch.FloatTensor(gt_ft_map).cuda()
         else:
             labels = torch.FloatTensor(gt_ft_map)
 
@@ -310,7 +310,7 @@ def feature_tester(dataloader,net,half,epoch):
     test_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
         if half: img = img.cuda()
-        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img = img if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
         if half:
@@ -335,7 +335,7 @@ def feature_tester(dataloader,net,half,epoch):
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
         if half:
-            labels = torch.FloatTensor(gt_ft_map).cuda().half()
+            labels = torch.FloatTensor(gt_ft_map).cuda()
         else:
             labels = torch.FloatTensor(gt_ft_map)
 
