@@ -221,8 +221,8 @@ class TwoLayer(nn.Module):
         return x
 
 def feature_main():
-    sim_train = Simulator(train=True)
-    sim_test = Simulator(train=False)
+    sim_train = Simulator(train=True,use_model=False)
+    sim_test = Simulator(train=False,use_model=False)
     opt = sim_train.opt
     half = opt.device != 'cpu'
 
@@ -275,8 +275,11 @@ def feature_trainer(dataloader,net,half,epoch):
         gt_ft_map = toMacroBlock(gt_ft_map)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
-        inputs = torch.FloatTensor(img)#.cuda()
-        labels = torch.FloatTensor(gt_ft_map)#.cuda()
+        inputs = torch.FloatTensor(img)
+        labels = torch.FloatTensor(gt_ft_map)
+        if half:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
 
         # zero gradient
         optimizer.zero_grad()
@@ -289,7 +292,7 @@ def feature_trainer(dataloader,net,half,epoch):
         optimizer.step()
         
         # print statistics
-        running_loss += loss.item()
+        running_loss += loss.cpu().item()
         tp += torch.sum(labels[outputs>0.5]==1)
         gt += torch.sum(labels==1)
         dt += torch.sum(outputs>0.5)
@@ -332,8 +335,11 @@ def feature_tester(dataloader,net,half,epoch):
         gt_ft_map = toMacroBlock(gt_ft_map)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
-        inputs = torch.FloatTensor(img)#.cuda()
-        labels = torch.FloatTensor(gt_ft_map)#.cuda()
+        inputs = torch.FloatTensor(img)
+        labels = torch.FloatTensor(gt_ft_map)
+        if half:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
 
         # forward + backward + optimize
         with torch.no_grad():
@@ -341,7 +347,7 @@ def feature_tester(dataloader,net,half,epoch):
             loss = criterion(outputs, labels)
         
         # print statistics
-        running_loss += loss.item()
+        running_loss += loss.cpu().item()
         tp += torch.sum(labels[outputs>0.5]==1)
         gt += torch.sum(labels==1)
         dt += torch.sum(outputs>0.5)
@@ -519,12 +525,14 @@ def setup_opt():
     return opt
 
 class Simulator:
-    def __init__(self,train=True):
+    def __init__(self,train=True,use_model=True):
         self.opt = setup_opt()
         self.opt.task = 'train' if train else 'val'
         self.model = get_model(self.opt)
         self.dataloader,self.nc = get_dataloader(self.opt,self.model)
         self.num_batches = len(self.dataloader)
+        if not use_model:
+            self.model = None
 
     def get_one_point(self, datarange, TF=None, C_param=None):
         # start counting the compressed size
