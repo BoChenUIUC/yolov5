@@ -17,267 +17,7 @@ from utils.general import coco80_to_coco91_class, check_dataset, check_file, che
 from utils.metrics import ap_per_class, ConfusionMatrix
 # from utils.plots import plot_images, output_to_target, plot_study_txt
 from utils.torch_utils import select_device, time_synchronized
-
-
-# def test(data,
-#          weights=None,
-#          batch_size=32,
-#          imgsz=640,
-#          conf_thres=0.001,
-#          iou_thres=0.6,  # for NMS
-#          save_json=False,
-#          single_cls=False,
-#          augment=False,
-#          verbose=False,
-#          model=None,
-#          dataloader=None,
-#          save_dir=Path(''),  # for saving images
-#          save_txt=False,  # for auto-labelling
-#          save_hybrid=False,  # for hybrid auto-labelling
-#          save_conf=False,  # save auto-label confidences
-#          plots=True,
-#          log_imgs=0,  # number of logged images
-#          compute_loss=None):
-#     # Initialize/load model and set device
-#     training = model is not None
-#     if training:  # called by train.py
-#         device = next(model.parameters()).device  # get model device
-
-#     else:  # called directly
-#         set_logging()
-#         device = select_device(opt.device, batch_size=batch_size)
-
-#         # Directories
-#         save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
-#         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
-
-#         # Load model
-#         model = attempt_load(weights, map_location=device)  # load FP32 model
-#         gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-#         imgsz = check_img_size(imgsz, s=gs)  # check img_size
-
-#         # Multi-GPU disabled, incompatible with .half() https://github.com/ultralytics/yolov5/issues/99
-#         # if device.type != 'cpu' and torch.cuda.device_count() > 1:
-#         #     model = nn.DataParallel(model)
-
-#     # Half
-#     half = device.type != 'cpu'  # half precision only supported on CUDA
-#     if half:
-#         model.half()
-
-#     # Configure
-#     model.eval()
-#     is_coco = data.endswith('coco.yaml')  # is COCO dataset
-#     with open(data) as f:
-#         data = yaml.load(f, Loader=yaml.SafeLoader)  # model dict
-#     check_dataset(data)  # check
-#     nc = 1 if single_cls else int(data['nc'])  # number of classes
-#     iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
-#     niou = iouv.numel()
-
-#     # Logging
-#     log_imgs, wandb = min(log_imgs, 100), None  # ceil
-#     try:
-#         import wandb  # Weights & Biases
-#     except ImportError:
-#         log_imgs = 0
-
-#     # Dataloader
-#     if not training:
-#         if device.type != 'cpu':
-#             model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
-#         path = data['test'] if opt.task == 'test' else data['val']  # path to val/test images
-#         dataloader = create_dataloader(path, imgsz, batch_size, gs, opt, pad=0.5, rect=True,
-#                                        prefix=colorstr('test: ' if opt.task == 'test' else 'val: '))[0]
-
-#     seen = 0
-#     confusion_matrix = ConfusionMatrix(nc=nc)
-#     names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
-#     coco91class = coco80_to_coco91_class()
-#     s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
-#     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
-#     loss = torch.zeros(3, device=device)
-#     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
-#     for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
-#         img = img.to(device, non_blocking=True)
-#         img = img.half() if half else img.float()  # uint8 to fp16/32
-#         img /= 255.0  # 0 - 255 to 0.0 - 1.0
-#         targets = targets.to(device)
-#         nb, _, height, width = img.shape  # batch size, channels, height, width
-
-#         with torch.no_grad():
-#             # Run model
-#             t = time_synchronized()
-#             out, train_out = model(img, augment=augment)  # inference and training outputs
-#             t0 += time_synchronized() - t
-
-#             # Compute loss
-#             if compute_loss:
-#                 loss += compute_loss([x.float() for x in train_out], targets)[1][:3]  # box, obj, cls
-
-#             # Run NMS
-#             targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
-#             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
-#             t = time_synchronized()
-#             out = non_max_suppression(out, conf_thres=conf_thres, iou_thres=iou_thres, labels=lb, multi_label=True)
-#             t1 += time_synchronized() - t
-
-#         # Statistics per image
-#         for si, pred in enumerate(out):
-#             labels = targets[targets[:, 0] == si, 1:]
-#             nl = len(labels)
-#             tcls = labels[:, 0].tolist() if nl else []  # target class
-#             path = Path(paths[si])
-#             seen += 1
-
-#             if len(pred) == 0:
-#                 if nl:
-#                     stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
-#                 continue
-
-#             # Predictions
-#             predn = pred.clone()
-#             scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
-
-#             # Append to text file
-#             if save_txt:
-#                 gn = torch.tensor(shapes[si][0])[[1, 0, 1, 0]]  # normalization gain whwh
-#                 for *xyxy, conf, cls in predn.tolist():
-#                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-#                     line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-#                     with open(save_dir / 'labels' / (path.stem + '.txt'), 'a') as f:
-#                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-#             # W&B logging
-#             if plots and len(wandb_images) < log_imgs:
-#                 box_data = [{"position": {"minX": xyxy[0], "minY": xyxy[1], "maxX": xyxy[2], "maxY": xyxy[3]},
-#                              "class_id": int(cls),
-#                              "box_caption": "%s %.3f" % (names[cls], conf),
-#                              "scores": {"class_score": conf},
-#                              "domain": "pixel"} for *xyxy, conf, cls in pred.tolist()]
-#                 boxes = {"predictions": {"box_data": box_data, "class_labels": names}}  # inference-space
-#                 wandb_images.append(wandb.Image(img[si], boxes=boxes, caption=path.name))
-
-#             # Append to pycocotools JSON dictionary
-#             if save_json:
-#                 # [{"image_id": 42, "category_id": 18, "bbox": [258.15, 41.29, 348.26, 243.78], "score": 0.236}, ...
-#                 image_id = int(path.stem) if path.stem.isnumeric() else path.stem
-#                 box = xyxy2xywh(predn[:, :4])  # xywh
-#                 box[:, :2] -= box[:, 2:] / 2  # xy center to top-left corner
-#                 for p, b in zip(pred.tolist(), box.tolist()):
-#                     jdict.append({'image_id': image_id,
-#                                   'category_id': coco91class[int(p[5])] if is_coco else int(p[5]),
-#                                   'bbox': [round(x, 3) for x in b],
-#                                   'score': round(p[4], 5)})
-
-#             # Assign all predictions as incorrect
-#             correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
-#             if nl:
-#                 detected = []  # target indices
-#                 tcls_tensor = labels[:, 0]
-
-#                 # target boxes
-#                 tbox = xywh2xyxy(labels[:, 1:5])
-#                 scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
-#                 if plots:
-#                     confusion_matrix.process_batch(predn, torch.cat((labels[:, 0:1], tbox), 1))
-
-#                 # Per target class
-#                 for cls in torch.unique(tcls_tensor):
-#                     ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
-#                     pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
-
-#                     # Search for detections
-#                     if pi.shape[0]:
-#                         # Prediction to target ious
-#                         ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
-
-#                         # Append detections
-#                         detected_set = set()
-#                         for j in (ious > iouv[0]).nonzero(as_tuple=False):
-#                             d = ti[i[j]]  # detected target
-#                             if d.item() not in detected_set:
-#                                 detected_set.add(d.item())
-#                                 detected.append(d)
-#                                 correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
-#                                 if len(detected) == nl:  # all targets already located in image
-#                                     break
-
-#             # Append statistics (correct, conf, pcls, tcls)
-#             stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
-
-#         # Plot images
-#         if plots and batch_i < 3:
-#             f = save_dir / f'test_batch{batch_i}_labels.jpg'  # labels
-#             Thread(target=plot_images, args=(img, targets, paths, f, names), daemon=True).start()
-#             f = save_dir / f'test_batch{batch_i}_pred.jpg'  # predictions
-#             Thread(target=plot_images, args=(img, output_to_target(out), paths, f, names), daemon=True).start()
-
-#     # Compute statistics
-#     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
-#     if len(stats) and stats[0].any():
-#         p, r, ap, f1, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
-#         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
-#         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
-#         nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
-#     else:
-#         nt = torch.zeros(1)
-
-#     # Print results
-#     pf = '%20s' + '%12.3g' * 6  # print format
-#     print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
-
-#     # Print results per class
-#     if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
-#         for i, c in enumerate(ap_class):
-#             print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
-
-#     # Print speeds
-#     t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1)) + (imgsz, imgsz, batch_size)  # tuple
-#     if not training:
-#         print('Speed: %.1f/%.1f/%.1f ms inference/NMS/total per %gx%g image at batch-size %g' % t)
-
-#     # Plots
-#     if plots:
-#         confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
-#         if wandb and wandb.run:
-#             val_batches = [wandb.Image(str(f), caption=f.name) for f in sorted(save_dir.glob('test*.jpg'))]
-#             wandb.log({"Images": wandb_images, "Validation": val_batches}, commit=False)
-
-#     # Save JSON
-#     if save_json and len(jdict):
-#         w = Path(weights[0] if isinstance(weights, list) else weights).stem if weights is not None else ''  # weights
-#         anno_json = '../coco/annotations/instances_val2017.json'  # annotations json
-#         pred_json = str(save_dir / f"{w}_predictions.json")  # predictions json
-#         print('\nEvaluating pycocotools mAP... saving %s...' % pred_json)
-#         with open(pred_json, 'w') as f:
-#             json.dump(jdict, f)
-
-#         try:  # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
-#             from pycocotools.coco import COCO
-#             from pycocotools.cocoeval import COCOeval
-
-#             anno = COCO(anno_json)  # init annotations api
-#             pred = anno.loadRes(pred_json)  # init predictions api
-#             eval = COCOeval(anno, pred, 'bbox')
-#             if is_coco:
-#                 eval.params.imgIds = [int(Path(x).stem) for x in dataloader.dataset.img_files]  # image IDs to evaluate
-#             eval.evaluate()
-#             eval.accumulate()
-#             eval.summarize()
-#             map, map50 = eval.stats[:2]  # update results (mAP@0.5:0.95, mAP@0.5)
-#         except Exception as e:
-#             print(f'pycocotools unable to run: {e}')
-
-#     # Return results
-#     model.float()  # for training
-#     if not training:
-#         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-#         print(f"Results saved to {save_dir}{s}")
-#     maps = np.zeros(nc) + map
-#     for i, c in enumerate(ap_class):
-#         maps[c] = ap[i]
-#     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
+import time
 
 def get_model(opt):
     device = select_device(opt.device, batch_size=opt.batch_size)
@@ -440,6 +180,178 @@ def run_model(opt,model,dataloader,nc,batch_idx_range,TF=None,C_param=None):
     print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
     return map50
+
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+class OneLayer(nn.Module):
+    def __init__(self):
+        super(OneLayer, self).__init__()
+        num_features = 32
+        self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_features)
+        self.final = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = self.final(x)
+        x = x.view(x.size(0), -1)
+        x = F.tanh(x)
+        x = x * 0.5 + 0.5
+        return x
+
+class TwoLayer(nn.Module):
+    def __init__(self):
+        super(TwoLayer, self).__init__()
+        num_features = 16
+        self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=2, padding=1)
+        self.bn1 = nn.BatchNorm2d(num_features)
+        self.conv2 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(num_features)
+        self.final = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+
+    def forward(self, x):
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.final(x)
+        x = x.view(x.size(0), -1)
+        x = F.tanh(x)
+        x = x * 0.5 + 0.5
+        return x
+
+def feature_main():
+    sim_train = Simulator(train=True)
+    sim_test = Simulator(train=False)
+    opt = sim_train.opt
+    half = opt.device != 'cpu'
+
+    net = TwoLayer()
+    if half: net = net.cuda()
+    # for i in range(10):
+    #     s = time.perf_counter()
+    #     print(net(torch.randn(1, 3, 320, 672)).shape)
+    #     print(time.perf_counter()-s)
+    # return 
+    
+    PATH = 'backup/sf.pth'
+    # net.load_state_dict(torch.load(PATH))
+
+    for epoch in range(100):
+        feature_trainer(sim_train.dataloader,net,half,epoch)
+        feature_tester(sim_test.dataloader,net,half,epoch)
+        torch.save(net.state_dict(), PATH)
+
+def feature_trainer(dataloader,net,half,epoch):
+    running_loss = 0.0
+    tp,gt,dt = 0.0,0.0,0.0
+    toMacroBlock = nn.MaxPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    criterion = nn.BCELoss()
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    train_iter = tqdm(dataloader)
+    for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
+        if half: img = img.cuda()
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        nb, _, height, width = img.shape  # batch size, channels, height, width
+        if half:
+            targets = targets.cuda()
+        if half:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+        else:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height])
+        gt_ft_map = torch.zeros(nb, height, width)
+        for si in range(nb):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl = len(labels)
+            if nl:
+                # target boxes
+                tbox = xywh2xyxy(labels[:, 1:5])
+                # xyxy
+                scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+                for x1,y1,x2,y2 in tbox:
+                    x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
+                    gt_ft_map[si,y1:y2,x1:x2] = 1
+        gt_ft_map = toMacroBlock(gt_ft_map)
+        gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
+
+        inputs = torch.FloatTensor(img)#.cuda()
+        labels = torch.FloatTensor(gt_ft_map)#.cuda()
+
+        # zero gradient
+        optimizer.zero_grad()
+
+        # forward + backward + optimize
+        outputs = net(inputs)
+        assert(labels.size(1) == outputs.size(1))
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        
+        # print statistics
+        running_loss += loss.item()
+        tp += torch.sum(labels[outputs>0.5]==1)
+        gt += torch.sum(labels==1)
+        dt += torch.sum(outputs>0.5)
+        prec = tp/dt
+        rec = tp/gt
+        f1_score = 2*prec*rec/(prec+rec)
+        train_iter.set_description(
+            f"Epoch: {epoch+1:3}. Batch: {batch_i:3}. "
+            f"Loss: {running_loss/(1+batch_i):.6f}. Prec: {prec:.6f}. Rec: {rec:.6f}. F1: {f1_score:.6f}. ")
+
+def feature_tester(dataloader,net,half,epoch):
+    running_loss = 0.0
+    tp,gt,dt = 0.0,0.0,0.0
+    toMacroBlock = nn.MaxPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
+    criterion = nn.BCELoss()
+    test_iter = tqdm(dataloader)
+    for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
+        if half: img = img.cuda()
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        nb, _, height, width = img.shape  # batch size, channels, height, width
+        if half:
+            targets = targets.cuda()
+        if half:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+        else:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height])
+        gt_ft_map = torch.zeros(nb, height, width)
+        for si in range(nb):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl = len(labels)
+            if nl:
+                # target boxes
+                tbox = xywh2xyxy(labels[:, 1:5])
+                # xyxy
+                scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+                for x1,y1,x2,y2 in tbox:
+                    x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
+                    gt_ft_map[si,y1:y2,x1:x2] = 1
+        gt_ft_map = toMacroBlock(gt_ft_map)
+        gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
+
+        inputs = torch.FloatTensor(img)#.cuda()
+        labels = torch.FloatTensor(gt_ft_map)#.cuda()
+
+        # forward + backward + optimize
+        with torch.no_grad():
+            outputs = net(inputs) 
+            loss = criterion(outputs, labels)
+        
+        # print statistics
+        running_loss += loss.item()
+        tp += torch.sum(labels[outputs>0.5]==1)
+        gt += torch.sum(labels==1)
+        dt += torch.sum(outputs>0.5)
+        prec = tp/dt
+        rec = tp/gt
+        f1_score = 2*prec*rec/(prec+rec)
+        test_iter.set_description(
+            f"Epoch: {epoch+1:3}. Batch: {batch_i:3}. "
+            f"Loss: {running_loss/(1+batch_i):.6f}. Prec: {prec:.6f}. Rec: {rec:.6f}. F1: {f1_score:.6f}. ")
+
 
 def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
     device = select_device(opt.device, batch_size=opt.batch_size)
@@ -627,13 +539,16 @@ class Simulator:
         map50s,crs = run_model_multi_range(self.opt,self.model,self.dataloader,self.nc,ranges,TF,C_param)
         return map50s,crs
 
+    def test(self):
+        feature_trainer(self.opt,self.dataloader)
+
+
 if __name__ == '__main__':
     sim = Simulator()
     r = sim.get_one_point((0,10))
     print(r)
     # opt = setup_opt()
     # print(opt)
-    exit(0)
 
     # if opt.task in ['val', 'test']:  # run normally
     #     test(opt.data,
