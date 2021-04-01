@@ -218,7 +218,7 @@ class TwoLayer(nn.Module):
         x = x.view(x.size(0), -1)
         x = F.tanh(x)
         x = x * 0.5 + 0.5
-        return x
+        return x.clamp(0,1)
 
 def feature_main():
     sim_train = Simulator(train=True,use_model=False)
@@ -272,7 +272,7 @@ def feature_trainer(dataloader,net,half,epoch):
                 for x1,y1,x2,y2 in tbox:
                     x1,y1,x2,y2 = int(x1),int(y1),int(x2),int(y2)
                     gt_ft_map[si,y1:y2,x1:x2] = 1
-        gt_ft_map = toMacroBlock(gt_ft_map)
+        gt_ft_map = toMacroBlock(gt_ft_map).clamp(0,1)
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
         if half:
