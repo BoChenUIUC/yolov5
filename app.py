@@ -237,7 +237,7 @@ def feature_main():
     # return 
     
 
-    for epoch in range(100):
+    for epoch in range(50):
         feature_trainer(sim_train.dataloader,net,half,epoch)
         feature_tester(sim_test.dataloader,net,half,epoch)
         torch.save(net.state_dict(), PATH)
