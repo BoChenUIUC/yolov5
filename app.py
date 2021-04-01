@@ -226,7 +226,9 @@ def feature_main():
     opt = sim_train.opt
     half = opt.device != 'cpu'
 
+    PATH = 'backup/sf.pth'
     net = TwoLayer()
+    # net.load_state_dict(torch.load(PATH))
     if half: net = net.cuda().half()
     # for i in range(10):
     #     s = time.perf_counter()
@@ -234,8 +236,6 @@ def feature_main():
     #     print(time.perf_counter()-s)
     # return 
     
-    PATH = 'backup/sf.pth'
-    # net.load_state_dict(torch.load(PATH))
 
     for epoch in range(100):
         feature_trainer(sim_train.dataloader,net,half,epoch)
@@ -276,7 +276,7 @@ def feature_trainer(dataloader,net,half,epoch):
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
         if half:
-            labels = torch.FloatTensor(gt_ft_map).cuda()
+            labels = torch.FloatTensor(gt_ft_map).cuda().half()
         else:
             labels = torch.FloatTensor(gt_ft_map)
 
