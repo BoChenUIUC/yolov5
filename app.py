@@ -251,7 +251,7 @@ def feature_trainer(dataloader,net,half,epoch):
     train_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
         if half: img = img.cuda()
-        img = img if half else img.float()  # uint8 to fp16/32
+        img = torch.FloatTensor(img) if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
         if half:
@@ -310,7 +310,7 @@ def feature_tester(dataloader,net,half,epoch):
     test_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
         if half: img = img.cuda()
-        img = img if half else img.float()  # uint8 to fp16/32
+        img = torch.FloatTensor(img) if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = img.shape  # batch size, channels, height, width
         if half:
