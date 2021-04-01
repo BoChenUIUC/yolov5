@@ -227,7 +227,7 @@ def feature_main():
     half = opt.device != 'cpu'
 
     net = TwoLayer()
-    if half: net = net.cuda()
+    if half: net = net.cuda().half()
     # for i in range(10):
     #     s = time.perf_counter()
     #     print(net(torch.randn(1, 3, 320, 672)).shape)
@@ -335,7 +335,7 @@ def feature_tester(dataloader,net,half,epoch):
         gt_ft_map = gt_ft_map.view(gt_ft_map.size(0),-1)
 
         if half:
-            labels = torch.FloatTensor(gt_ft_map).cuda()
+            labels = torch.FloatTensor(gt_ft_map).cuda().half()
         else:
             labels = torch.FloatTensor(gt_ft_map)
 
