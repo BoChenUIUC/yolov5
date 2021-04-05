@@ -188,11 +188,11 @@ class ParetoFront:
 	def cov(self,other):
 		covered = 0.0
 		for dp1 in other.data:
-			if dp1 in [(0,1),(1,0)]:continue
+			# if dp1 in [(0,1),(1,0)]:continue
 			dominated = False
 			for dp2 in self.data:
 				# if dp2 in [(0,1),(1,0)]:continue
-				if (dp2[0]>dp1[0] and dp2[1]>=dp1[1]) or (dp2[0]>=dp1[0] and dp2[1]>dp1[1]):
+				if dp2[0]>dp1[0] and dp2[1]>dp1[1]:
 					dominated = True
 					break
 			if dominated:covered += 1
@@ -331,7 +331,6 @@ def pareto_front_approx_nsga2(comp_name):
 
 # PFA using MOBO
 def pareto_front_approx_mobo(comp_name,max_iter=1000):
-	start = time.perf_counter()
 	d = {}
 	d['cfg_file'] = open(comp_name+'_'+'MOBO_cfg.log', "w", 1)
 	d['acc_file'] = open(comp_name+'_'+'MOBO_acc.log', "w", 1)
@@ -341,21 +340,18 @@ def pareto_front_approx_mobo(comp_name,max_iter=1000):
 		sim = Simulator(train=True)
 		TF = Transformer(comp_name)
 		datarange = [0,100]
-		print('Iter:',d['iter'],x)
 		acc,cr = sim.get_one_point(datarange=datarange, TF=TF, C_param=x)
 		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
 		d['acc_file'].write(str(float(acc))+'\n')
 		d['cr_file'].write(str(cr)+'\n')
 		d['iter'] += 1
+		print('Iter:',d['iter'],x,float(acc),cr)
 		return np.array([float(acc),cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
-		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
+		pbounds=np.array([[-0.5,0.5],[-0.5,0.5],[-0.5,0.5],[-0.5,0.5]]))
 	Optimizer.initialize(init_points=50)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
-	end = time.perf_counter()
-	with open('MOBO_time.log','w',1) as f:
-		f.write(str(end-start)+'s')
 
 # PFA
 def pareto_front_approx(comp_name,EXP_NAME):
@@ -416,11 +412,6 @@ def evaluation(EXP_NAME):
 	elif EXP_NAME == 'RAW':
 		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
 		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
-	elif EXP_NAME == 'Scale':
-		for i in range(1,101):
-			print(EXP_NAME,i)
-			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i/100.0)
-			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	else:
 		for i in range(101):
 			print(EXP_NAME,i)
@@ -496,97 +487,18 @@ def test_run():
 
 def generate_image_samples(EXP_NAME):
 	sim = Simulator(train=False)
-	TF = Transformer(name=EXP_NAME,snapshot=False)
-	datarange = [0,1]#sim.num_batches]
-	selected_lines = [197,144]
-	# replace pf file later
-	with open(EXP_NAME+'_MOBO_pf.log','r') as f:
-		for lcnt,line in enumerate(f.readlines()):
-			if lcnt not in selected_lines:
-				continue
-			tmp = line.strip().split(' ')
-			acc,cr = float(tmp[0]),float(tmp[1])
-			C_param = np.array([float(n) for n in tmp[2:]] + [-0.3])
-			acc1,cr1 = sim.get_one_point(datarange, TF=TF, C_param=C_param)
-			print(acc1,cr1,C_param)
-			break
+	TF = Transformer(name=EXP_NAME,snapshot=True)
+	C_param = np.array([-.3,-.5,.5,0])
+	acc1,cr1 = sim.get_one_point([0,sim.num_batches], TF=TF, C_param=C_param)
+	print(acc1,cr1,C_param)
 	m,s = TF.get_compression_time()
 	print(m,s)
 
-def dual_train(net):
-	np.random.seed(123)
-	criterion = nn.MSELoss(reduction='sum')
-	optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
-	log_file = open('training.log', "w", 1)
-	log_file.write('Training...\n')
-
-	# setup target network
-	# so that we only do this once
-	sim = Simulator(10)
-	cgen = C_Generator()
-	num_cfg = 1#sim.point_per_sim//batch_size
-	print('Num batches:',num_cfg,sim.point_per_sim)
-
-	for epoch in range(10):
-		running_loss = 0.0
-		TF = Transformer('Tiled')
-		# the pareto front can be restarted, need to try
-
-		for bi in range(num_cfg):
-			inputs,labels = [],[]
-			# DDPG-based generator
-			C_param = cgen.get()
-			# batch result of mAP and compression ratio
-			batch_acc, batch_cr = [],[]
-			for k in range(batch_size):
-				di = bi*batch_size + k # data index
-				# start counting the compressed size
-				TF.reset()
-				# apply the compression param chosen by the generator
-				fetch_start = time.perf_counter()
-				# the function to get results from cloud model
-				sim_result = sim.get_one_point(index=di, TF=TF, C_param=np.copy(C_param))
-				fetch_end = time.perf_counter()
-				# get the compression ratio
-				cr = TF.get_compression_ratio()
-				batch_acc += [sim_result]
-				batch_cr += [cr]
-				print_str = str(di)+str(C_param)+'\t'+str(sim_result)+'\t'+str(cr)+'\t'+str(fetch_end-fetch_start)
-				print(print_str)
-				log_file.write(print_str+'\n')
-				inputs.append(C_param)
-				labels.append(sim_result) # accuracy of IoU=0.5
-			# optimize generator
-			cgen.optimize((np.mean(batch_acc),np.mean(batch_cr)),False)
-			log_file.write(print_str+'\n')
-			# transform to tensor
-			inputs = torch.FloatTensor(inputs)#.cuda()
-			labels = torch.FloatTensor(labels)#.cuda()
-
-			# zero gradient
-			optimizer.zero_grad()
-
-			# forward + backward + optimize
-			outputs = net(inputs)
-			loss = criterion(outputs, labels)
-			loss.backward()
-			optimizer.step()
-
-			# print statistics
-			running_loss += loss.item()
-			val_loss = abs(torch.mean(labels.cpu()-outputs.cpu()))
-			print_str = '{:d}, {:d}, loss {:.6f}, val loss {:.6f}'.format(epoch + 1, bi + 1, loss.item(), val_loss)
-			print(print_str)
-			log_file.write(print_str + '\n')
-		print_str = str(cgen.paretoFront.data.keys())
-		print(print_str)
-		cgen.optimize(None,True)
-		torch.save(net.state_dict(), PATH)
-
 
 def test():
-	from app import feature_main
-	feature_main()
+	from app import feature_main,perturb_main
+	# feature_main()
+	perturb_main()
 
 if __name__ == "__main__":
 	np.random.seed(123)
@@ -596,7 +508,7 @@ if __name__ == "__main__":
 	# test()
 
 	# samples for eval
-	# generate_image_samples('Tiled')
+	# generate_image_samples('CNN')
 
 	# speed test
 	# for name in ['Tiled']:
@@ -613,8 +525,8 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	# for comp_name in['Tiled']:
-	# 	pareto_front_approx_mobo(comp_name,450)
+	for comp_name in['CNN']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)
@@ -624,8 +536,8 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['Scale']:
-		evaluation(name)
+	# for name in ['Tiled']:
+	# 	evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()

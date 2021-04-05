@@ -221,22 +221,22 @@ class TwoLayer(nn.Module):
         return x
 
 def feature_main():
-    sim_train = Simulator(train=True,use_model=False)
-    sim_test = Simulator(train=False,use_model=False)
-    opt = sim_train.opt
-    half = opt.device != 'cpu'
-
     PATH = 'backup/sf.pth'
     net = TwoLayer()
-    # net.load_state_dict(torch.load(PATH))
-    if half: net = net.cuda()
+    net.load_state_dict(torch.load(PATH,map_location='cpu'))
+    net.eval()
     # for i in range(10):
     #     s = time.perf_counter()
     #     print(net(torch.randn(1, 3, 320, 672)).shape)
     #     print(time.perf_counter()-s)
     # return 
-    
 
+    sim_train = Simulator(train=True,use_model=False)
+    sim_test = Simulator(train=False,use_model=False)
+    opt = sim_train.opt
+    half = opt.device != 'cpu'
+    
+    if half: net = net.cuda()
     for epoch in range(50):
         feature_trainer(sim_train.dataloader,net,half,epoch)
         feature_tester(sim_test.dataloader,net,half,epoch)
@@ -302,7 +302,7 @@ def feature_trainer(dataloader,net,half,epoch):
             f"Epoch: {epoch+1:3}. Batch: {batch_i:3}. "
             f"Loss: {running_loss/(1+batch_i):.6f}. Prec: {prec:.6f}. Rec: {rec:.6f}. F1: {f1_score:.6f}. ")
 
-def feature_tester(dataloader,net,half,epoch):
+def feature_tester(dataloader,net,half,epoch,thresh=0.5):
     running_loss = 0.0
     tp,gt,dt = 0.0,0.0,0.0
     toMacroBlock = nn.MaxPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
@@ -346,9 +346,9 @@ def feature_tester(dataloader,net,half,epoch):
         
         # print statistics
         running_loss += loss.cpu().item()
-        tp += torch.sum(labels[outputs>0.5]==1)
+        tp += torch.sum(labels[outputs>thresh]==1)
         gt += torch.sum(labels==1)
-        dt += torch.sum(outputs>0.5)
+        dt += torch.sum(outputs>thresh)
         prec = tp/dt
         rec = tp/gt
         f1_score = 2*prec*rec/(prec+rec)
@@ -356,6 +356,129 @@ def feature_tester(dataloader,net,half,epoch):
             f"Epoch: {epoch+1:3}. Batch: {batch_i:3}. "
             f"Loss: {running_loss/(1+batch_i):.6f}. Prec: {prec:.6f}. Rec: {rec:.6f}. F1: {f1_score:.6f}. ")
 
+def perturb_main():
+    sim_train = Simulator(train=True)
+    opt = sim_train.opt
+    for epoch in range(1):
+        perturb_trainer(opt,sim_train.model,sim_train.dataloader,sim_train.nc,[0,1])
+
+def perturb_trainer(opt,model,dataloader,nc,batch_idx_range):
+    device = select_device(opt.device, batch_size=opt.batch_size)
+    
+    half = device.type != 'cpu'
+    if half:
+        iouv = torch.linspace(0.5, 0.95, 10).cuda()
+    else:
+        iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+    niou = iouv.numel()
+
+    seen = 0
+    names = {k: v for k, v in enumerate(model.names if hasattr(model, 'names') else model.module.names)}
+    coco91class = coco80_to_coco91_class()
+    s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
+    p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+    stats, ap, ap_class = [], [], []
+    for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)):
+        if batch_i<batch_idx_range[0]:continue
+        elif batch_i>=batch_idx_range[1]:break
+        if half: img = img.cuda()
+        # img = img.to(device, non_blocking=True)
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if half:targets = targets.cuda()
+        # targets = targets.to(device)
+        nb, _, height, width = img.shape  # batch size, channels, height, width
+
+        with torch.no_grad():
+            # Run model
+            t = time_synchronized()
+            try:
+                out, train_out = model(img, augment=opt.augment)  # inference and training outputs
+            except Exception as e:
+                print(traceback.format_exc())
+                print(batch_i,img.shape,C_param)
+            
+            t0 += time_synchronized() - t
+
+            # Run NMS
+            if half:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+            else:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
+            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
+            t = time_synchronized()
+            out = non_max_suppression(out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            t1 += time_synchronized() - t
+
+        # Statistics per image
+        for si, pred in enumerate(out):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl = len(labels)
+            tcls = labels[:, 0].tolist() if nl else []  # target class
+            seen += 1
+
+            if len(pred) == 0:
+                if nl:
+                    stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
+                continue
+
+            # Predictions
+            predn = pred.clone()
+            scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
+
+            # Assign all predictions as incorrect
+            if half:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+            else:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
+            if nl:
+                detected = []  # target indices
+                tcls_tensor = labels[:, 0]
+
+                # target boxes
+                tbox = xywh2xyxy(labels[:, 1:5])
+                scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+
+                # Per target class
+                for cls in torch.unique(tcls_tensor):
+                    ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
+                    pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
+
+                    # Search for detections
+                    if pi.shape[0]:
+                        # Prediction to target ious
+                        ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
+                        print(si,pi.size(),ti.size(),ious.size())
+
+                        # Append detections
+                        detected_set = set()
+                        for j in (ious > iouv[0]).nonzero(as_tuple=False):
+                            d = ti[i[j]]  # detected target
+                            if d.item() not in detected_set:
+                                detected_set.add(d.item())
+                                detected.append(d)
+                                correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+                                if len(detected) == nl:  # all targets already located in image
+                                    break
+
+            # Append statistics (correct, conf, pcls, tcls)
+            stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+
+    # Compute statistics
+    stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
+    if len(stats) and stats[0].any():
+        p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, names=names)
+        ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
+    else:
+        nt = torch.zeros(1)
+
+    # Print results
+    pf = '%20s' + '%12.3g' * 6  # print format
+    print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
+
+    return map50
 
 def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
     device = select_device(opt.device, batch_size=opt.batch_size)

@@ -13,6 +13,8 @@ import pickle,sys,os
 import subprocess
 import matplotlib.pyplot as plt
 import matplotlib
+import torch.nn as nn
+import torch.nn.functional as F
 from compression.turbojpeg import TurboJPEG
 
 dataset = 'ucf101-24'
@@ -408,7 +410,6 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 				feature_frame = cv2.circle(feature_frame, (int(px),int(py)), radius=2, color=color, thickness=-1)
 		cv2.imwrite(f'samples/{counter:02}_feature.jpg',feature_frame)
 	
-
 	# whether to scale the tile
 	scaler = 1
 	assert(len(C_param)==num_features+4)
@@ -486,6 +487,84 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
 
+def CNN_encoder(image, C_param, jpeg, model, counter, snapshot=False):
+	start = time.perf_counter()
+	# analyze features in image
+	toSave = snapshot and counter<5
+	# analyze features in image
+	bgr_frame = np.array(image)
+	bgr_frame = np.ascontiguousarray(bgr_frame)
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_origin.jpg',bgr_frame)
+	th_img = torch.from_numpy(image[:,:,(2,1,0)]).permute(2,0,1).unsqueeze(0)
+	
+	assert(len(C_param)==4)
+	# scaler
+	scaler = int(((C_param[0]+0.5)*10)) + 1
+	scaler = min(scaler,10); scaler = max(scaler,1)
+	# lower and upper
+	lower,upper = C_param[1:3] + 0.5
+	lower,upper = min(lower,upper),max(lower,upper)
+	lower = max(lower,0);upper = min(upper,1)
+	# shape
+	k = int(((C_param[3]+0.5)*5))
+	k = min(k,4); k = max(k,0)
+	order_choices = [1./3,1./2,1,2,3]
+
+	# divide image to tiles
+	img_h,img_w = bgr_frame.shape[:2]
+	block_w,block_h = 16,8
+	tile_w,tile_h = 16*scaler,8*scaler
+	# compute block height/width
+	heightInBlock = int(img_h/block_h) if img_h%block_h==0 else (int(img_h/block_h) + 1)
+	widthInBlock = int(img_w/block_w) if img_w%block_w==0 else (int(img_w/block_w) + 1)
+	heightInTile = int(img_h/tile_h) if img_h%tile_h==0 else (int(img_h/tile_h) + 1)
+	widthInTile = int(img_w/tile_w) if img_w%tile_w==0 else (int(img_w/tile_w) + 1)
+
+	# CNN features
+	with torch.no_grad():
+		img = th_img.float() / 255.0  
+		cnn_feat = model(img,flag=True)
+		pool = nn.AvgPool2d(kernel_size=(scaler,2*scaler), stride=(scaler,2*scaler), padding=0, ceil_mode=True)
+		cnn_feat = pool(cnn_feat)
+		assert(heightInTile == cnn_feat.size(2) and widthInTile == cnn_feat.size(3))
+		cnn_feat = cnn_feat.view(cnn_feat.size(0), -1).numpy()
+	quality = (upper-lower)*cnn_feat[0]**order_choices[k] + lower
+
+	# convert to fit number of MBs
+	if scaler > 1:
+		quality = np.reshape(quality,(heightInTile,widthInTile))
+		quality = np.repeat(quality,scaler,axis=0)
+		quality = np.repeat(quality,scaler,axis=1)
+		quality = quality[:heightInBlock,:widthInBlock].flatten() 
+
+	# generate heatmap
+	if toSave:
+		hm = np.reshape(quality,(heightInBlock,widthInBlock))
+		hm = np.repeat(hm,2,axis=1)
+		# plt.imshow(hm, cmap='hot', interpolation='nearest')
+		# plt.savefig(f'samples/{counter:2}_heatmap.jpg')
+		fig, ax = plt.subplots()
+
+		im, cbar = heatmap(hm, [str(i) for i in range(heightInBlock)],
+						 [str(i) for i in range(widthInBlock)], 
+						 ax=ax, cmap="coolwarm")
+		# texts = annotate_heatmap(im, valfmt="{x:.2f}")
+
+		fig.tight_layout()
+		plt.savefig(f'samples/{counter:02}_heatmap.jpg')
+
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
+	# feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*85
+	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	compressed_size = len(jpegraw)
+	end = time.perf_counter()
+	bgr_frame = jpeg.decode(jpegraw,feature_encoding) 
+	if toSave:
+		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
+	return bgr_frame,original_size,compressed_size,end-start
+
 def JPEG2000(npimg,C_param):
 	comp_dir = 'compression/jpeg2000/'
 	tmp_dir = comp_dir + 'tmp/'
@@ -542,6 +621,52 @@ def WebP(npimg,C_param):
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 	return lossy_image,osize,csize,end-start
 
+def tile_scaler(image, C_param):
+	start = time.perf_counter() 
+	# analyze features in image
+	bgr_frame = np.array(image) 
+	img_h,img_w = bgr_frame.shape[:2]
+	 
+	# not used for training,but can be used for 
+	# ploting the pareto front
+	dsize = (int(img_w*C_param),int(C_param*img_h))
+	original_size = len(pickle.dumps(bgr_frame, 0))
+	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+	compressed_size = len(pickle.dumps(compressed, 0))
+	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
+
+	end = time.perf_counter()
+	return decompressed,original_size,compressed_size,end-start
+
+
+class TwoLayer(nn.Module):
+	def __init__(self):
+		super(TwoLayer, self).__init__()
+		num_features = 16
+		self.conv1 = nn.Conv2d(3, num_features, kernel_size=3, stride=2, padding=1)
+		self.bn1 = nn.BatchNorm2d(num_features)
+		self.conv2 = nn.Conv2d(num_features, num_features, kernel_size=3, stride=1, padding=1)
+		self.bn2 = nn.BatchNorm2d(num_features)
+		self.final = nn.Conv2d(num_features, 1, kernel_size=3, stride=1, padding=1)
+		self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0, ceil_mode=True)
+
+	def forward(self, x, flag=False): 
+		x = self.pool(F.relu(self.bn1(self.conv1(x))))
+		x = self.pool(F.relu(self.bn2(self.conv2(x))))
+		x = self.final(x)
+		if flag == False:
+			x = x.view(x.size(0), -1)
+		x = F.tanh(x)
+		x = x * 0.5 + 0.5
+		return x
+
+def load_CNN():
+	PATH = 'backup/sf.pth'
+	net = TwoLayer()
+	net.load_state_dict(torch.load(PATH,map_location='cpu'))
+	net.eval()
+	return net
+
 # define a class for transformation
 class Transformer:
 	def __init__(self,name,snapshot = False):
@@ -550,15 +675,18 @@ class Transformer:
 		self.snapshot = snapshot
 		self.counter = 0
 		self.time = []
+		if self.name in ['JPEG','Tiled','CNN']:
+			self.jpeg = TurboJPEG()
+		if self.name in['CNN']:
+			self.CNN = load_CNN()
 
 	def transform(self, image=None, C_param=None):
 		# need to recover images and print examples
 		# get JPEG lib
 		if self.name == 'JPEG':
-			self.jpeg = TurboJPEG()
 			# 0->100
-			rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
-			# rimage,osize,csize,t = JPEG(image,C_param)
+			# rimage,osize,csize,t = TUBBOJPEG(image,C_param,self.jpeg)
+			rimage,osize,csize,t = JPEG(image,C_param)
 		elif self.name == 'JPEG2000':
 			rimage,osize,csize,t = JPEG2000(image,C_param)
 		elif self.name == 'WebP':
@@ -567,8 +695,11 @@ class Transformer:
 		elif self.name == 'TiledLegacy':
 			rimage,osize,csize,t = tile_legacy(image, C_param, self.counter, self.snapshot)
 		elif self.name == 'Tiled':	
-			self.jpeg = TurboJPEG()
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
+		elif self.name == 'CNN':
+			rimage,osize,csize,t = CNN_encoder(image, C_param, self.jpeg, self.CNN, self.counter, self.snapshot)
+		elif self.name == 'Scale':
+			rimage,osize,csize,t = tile_scaler(image, C_param)
 		else:
 			print(self.name,'not implemented.')
 			exit(1)
