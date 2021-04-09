@@ -80,7 +80,7 @@ def configs2paretofront(EXP_NAME,max_points):
 	pf.save()
 
 def eval_metrics():
-	names = ['Tiled','JPEG','JPEG2000','WebP']
+	names = ['Tiled','JPEG','JPEG2000','WebP','Scale','TiledLegacy']
 	pfs = [ParetoFront(name,10000) for name in names]
 	for ei,exp in enumerate(names):
 		filename = 'all_data/' + exp + '_eval.log'
@@ -457,6 +457,8 @@ def speed_test(EXP_NAME):
 			rate_ranges = range(6)
 		elif EXP_NAME == 'WebP':
 			rate_ranges = [0,5,37,100]
+		elif EXP_NAME == 'Scale':
+			rate_ranges = [0.1*x for x in range(1,11)]
 		for r in rate_ranges:
 			print(EXP_NAME,r)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=r)
@@ -495,9 +497,9 @@ def test_run():
 		cr_file.write(' '.join([str(n) for n in crs])+'\n')
 
 def generate_image_samples(EXP_NAME):
-	sim = Simulator(train=False)
-	TF = Transformer(name=EXP_NAME,snapshot=False)
-	datarange = [0,1]#sim.num_batches]
+	sim = Simulator(train=True)
+	TF = Transformer(name=EXP_NAME,snapshot=True)
+	datarange = [70,71]#sim.num_batches]
 	selected_lines = [197,144]
 	# replace pf file later
 	with open(EXP_NAME+'_MOBO_pf.log','r') as f:
@@ -599,7 +601,7 @@ if __name__ == "__main__":
 	# generate_image_samples('Tiled')
 
 	# speed test
-	# for name in ['Tiled']:
+	# for name in ['TiledLegacy']:
 	# 	speed_test(name)
 
 	# 1. determine lenght of episode
@@ -613,8 +615,8 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	# for comp_name in['Tiled']:
-	# 	pareto_front_approx_mobo(comp_name,450)
+	for comp_name in['TiledLegacy']:
+		pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)
@@ -624,8 +626,8 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['Scale']:
-		evaluation(name)
+	# for name in ['Scale']:
+	# 	evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()

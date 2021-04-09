@@ -16,6 +16,7 @@ import matplotlib
 import torch.nn as nn
 import torch.nn.functional as F
 from compression.turbojpeg import TurboJPEG
+from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
 
@@ -356,6 +357,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	compressed_size = 0
 	original_size = 0
 	tile_size = tilew * tileh
+	huffman = HuffmanCoding()
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
 		crop = bgr_frame[y1:y2,x1:x2].copy()
@@ -368,7 +370,8 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 		else:
 			try:
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-				compressed_size += len(pickle.dumps(crop_d, 0))
+				# compressed_size += len(pickle.dumps(crop_d, 0))
+				compressed_size += len(huffman.compress(crop_d.reshape(-1)))
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
 			except Exception as e:
 				print(repr(e))
@@ -384,7 +387,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start = time.perf_counter()
-	toSave = snapshot and counter<5
+	toSave = snapshot and counter<16
 	# analyze features in image
 	bgr_frame = np.array(image)
 	bgr_frame = np.ascontiguousarray(bgr_frame)
@@ -395,9 +398,13 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# FAST
 	fast = get_FAST(bgr_frame)
 	# STAR
-	star = get_STAR(bgr_frame)
+	# star = get_STAR(bgr_frame)
+	# # ORB
+	# orb = get_ORB(bgr_frame)
+	star = get_SIFT(bgr_frame)
 	# ORB
-	orb = get_ORB(bgr_frame)
+	# orb = get_ORB(bgr_frame)
+	orb = get_GFTT(bgr_frame)
 
 	point_features = [fast, star, orb]
 	num_features = len(point_features)
@@ -632,10 +639,13 @@ def tile_scaler(image, C_param):
 	dsize = (int(img_w*C_param),int(C_param*img_h))
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-	compressed_size = len(pickle.dumps(compressed, 0))
+	# compressed_size = len(pickle.dumps(compressed, 0))
+	
+	huffman = HuffmanCoding()
+	compressed_size = len(huffman.compress(compressed.reshape(-1)))
+	end = time.perf_counter()
 	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 
-	end = time.perf_counter()
 	return decompressed,original_size,compressed_size,end-start
 
 
