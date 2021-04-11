@@ -80,7 +80,7 @@ def configs2paretofront(EXP_NAME,max_points):
 	pf.save()
 
 def eval_metrics():
-	names = ['Tiled','JPEG','JPEG2000','WebP','Scale','TiledLegacy']
+	names = ['JPEG','Scale','JPEG2000','WebP','Tiled','TiledLegacy']
 	pfs = [ParetoFront(name,10000) for name in names]
 	for ei,exp in enumerate(names):
 		filename = 'all_data/' + exp + '_eval.log'
@@ -89,10 +89,11 @@ def eval_metrics():
 				line = line.strip().split(' ')
 				acc,cr = float(line[0]),float(line[1])
 				pfs[ei].add(np.zeros(6),(acc,cr))
-	for pf in pfs:
+	for pf,name in zip(pfs,names):
+		print(name)
 		print(pf.area(0),pf.area(0.4),pf.uniformity())
-		for pf2 in pfs:
-			print(pf.cov(pf2))
+		for pf2,name in zip(pfs,names):
+			print(name,pf.cov(pf2))
 
 
 def comparePF(max_lines):
@@ -417,7 +418,7 @@ def evaluation(EXP_NAME):
 		acc,cr = sim.get_one_point(datarange, TF=None, C_param=None)
 		eval_file.write(f"{acc:.3f} {cr:.3f}\n")
 	elif EXP_NAME == 'Scale':
-		for i in range(1,101):
+		for i in range(1,101)[::-1]:
 			print(EXP_NAME,i)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=i/100.0)
 			eval_file.write(f"{acc:.3f} {cr:.3f}\n")
@@ -615,19 +616,19 @@ if __name__ == "__main__":
 
 	# profiling for Tiled, TiledWebP, TiledJPEG
 	# change iters to 500
-	for comp_name in['TiledLegacy']:
-		pareto_front_approx_mobo(comp_name,450)
+	# for comp_name in['TiledLegacy']:
+	# 	pareto_front_approx_mobo(comp_name,450)
 
 	# compute eval metrics
 	# comparePF(500)
 
 	# convert from .log file to pf for eval
-	# configs2paretofront('Tiled_MOBO',500)
+	configs2paretofront('TiledLegacy_MOBO',500)
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['Scale']:
-	# 	evaluation(name)
+	for name in ['TiledLegacy']:
+		evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()
