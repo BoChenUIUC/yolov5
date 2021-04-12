@@ -408,7 +408,7 @@ def evaluation(EXP_NAME):
 
 	if EXP_NAME in ['Tiled', 'TiledLegacy']:
 		with open(EXP_NAME+'_MOBO_pf.log','r') as f:
-			for line in f.readlines()[::-1]:
+			for line in f.readlines():
 				tmp = line.strip().split(' ')
 				acc,cr = float(tmp[0]),float(tmp[1])
 				C_param = np.array([float(n) for n in tmp[2:]])
@@ -627,8 +627,8 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['TiledLegacy']:
-		evaluation(name)
+	# for name in ['TiledLegacy']:
+	# 	evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()
