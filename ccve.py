@@ -623,12 +623,12 @@ if __name__ == "__main__":
 	# comparePF(500)
 
 	# convert from .log file to pf for eval
-	configs2paretofront('TiledLegacy_MOBO',500)
+	# configs2paretofront('TiledLegacy_MOBO',500)
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	# for name in ['TiledLegacy']:
-	# 	evaluation(name)
+	for name in ['TiledLegacy']:
+		evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()
