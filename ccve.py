@@ -126,9 +126,9 @@ class ParetoFront:
 		self.data[(1,0)] = (np.pi/2,None)
 		# average compression param of cfgs
 		# on and not on pareto front
-		self.dominated_c_param = np.zeros(6,dtype=np.float64)
+		self.dominated_c_param = np.zeros(7,dtype=np.float64)
 		self.dominated_cnt = 1e-6
-		self.dominating_c_param = np.zeros(6,dtype=np.float64)
+		self.dominating_c_param = np.zeros(7,dtype=np.float64)
 		self.dominating_cnt = 1e-6
 		self.reward = 0
 
