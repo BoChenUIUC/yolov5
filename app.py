@@ -223,7 +223,7 @@ class TwoLayer(nn.Module):
 
 def deepcod_main():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer
-    sim_train = Simulator(train=True,use_model=True)
+    sim_train = Simulator(train=False,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
 
     opt = sim_train.opt
@@ -243,7 +243,7 @@ def deepcod_main():
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
-    for epoch in range(1,1001):
+    for epoch in range(1,101):
         # train
         gen_model.train()
         iouv = torch.linspace(0.5, 0.95, 10)
