@@ -28,7 +28,7 @@ def get_model(opt):
     half = device.type != 'cpu'  # half precision only supported on CUDA
     # if half:
     #     model.half()
-    model.to(device)
+    model.cuda()
     model.eval()
     return model
 
