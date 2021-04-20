@@ -48,6 +48,7 @@ class Detect(nn.Module):
                 if self.grid[i].shape[2:4] != x[i].shape[2:4]:
                     # self.grid[i] = self._make_grid(nx, ny).to(x[i].device)
                     self.grid[i] = self._make_grid(nx, ny)
+                    print(self.grid[i].device)
                     self.grid[i] = self.grid[i].cuda()
 
                 y = x[i].sigmoid()
