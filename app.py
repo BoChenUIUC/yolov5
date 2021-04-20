@@ -265,14 +265,11 @@ def deepcod_main():
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # Run model
-            t = time_synchronized()
             recon = gen_model(img)
             # output of generated input
             recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
             # output of original input
             origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
-            
-            t0 += time_synchronized() - t
 
             # backprop
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
@@ -291,9 +288,9 @@ def deepcod_main():
                 targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
-            t = time_synchronized()
+
             out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
-            t1 += time_synchronized() - t
+
 
             # Statistics per image
             for si, pred in enumerate(out):
