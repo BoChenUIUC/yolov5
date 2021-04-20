@@ -258,7 +258,6 @@ def deepcod_main():
         stats, ap, ap_class = [], [], []
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
-            if batch_i == 10:break
             if half: img = img.cuda()
             img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
