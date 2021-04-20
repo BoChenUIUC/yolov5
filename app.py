@@ -277,9 +277,9 @@ def deepcod_main():
             # backprop
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
             loss += criterion_mse(img,recon)
-            for origin_feat,recon_feat in zip(origin_features,recon_features):
-                if origin_feat is None:continue
-                loss += criterion_mse(origin_feat,recon_feat)
+            # for origin_feat,recon_feat in zip(origin_features,recon_features):
+                # if origin_feat is None:continue
+                # loss += criterion_mse(origin_feat,recon_feat)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -292,7 +292,7 @@ def deepcod_main():
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
-            out = non_max_suppression(origin_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
             # Statistics per image
