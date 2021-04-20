@@ -31,8 +31,6 @@ def get_model(opt):
     model.eval()
     if device.type != 'cpu':
         model.cuda()
-        model(torch.zeros(1, 3, opt.img_size, opt.img_size).to(device).type_as(next(model.parameters())))  # run once
-        
     return model
 
 def get_dataloader(opt,model):
