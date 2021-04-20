@@ -28,7 +28,7 @@ def get_model(opt):
     half = device.type != 'cpu'  # half precision only supported on CUDA
     # if half:
     #     model.half()
-    model.cuda()
+    #     model.cuda()
     model.eval()
     return model
 
@@ -232,19 +232,22 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
+    if half:disc_model = disc_model.cuda()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
-    gen_model.to(device)
+    if half:gen_model = gen_model.cuda()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
     for epoch in range(1,101):
         # train
         gen_model.train()
-        iouv = torch.linspace(0.5, 0.95, 10)
-        if half:iouv = iouv.to(device)
+        if half:
+            iouv = torch.linspace(0.5, 0.95, 10).cuda()
+        else:
+            iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
         niou = iouv.numel()
         nc = sim_train.nc
         seen = 0
@@ -255,18 +258,16 @@ def deepcod_main():
         stats, ap, ap_class = [], [], []
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
-            img = img.float()
-            if half: img = img.to(device)
-            # img = img.half() if half else img.float()  # uint8 to fp16/32
+            if half: img = img.cuda()
+            img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            if half:targets = targets.to(device)
+            if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # Run model
             t = time_synchronized()
             recon = gen_model(img)
             # output of generated input
-            print('a',recon.device,next(gen_model.parameters()).device,next(disc_model.parameters()).device)
             recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
             # output of original input
             origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
@@ -293,7 +294,7 @@ def deepcod_main():
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
-            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            out = non_max_suppression(origin_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
             # Statistics per image
