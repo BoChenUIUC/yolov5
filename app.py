@@ -281,7 +281,7 @@ def deepcod_main():
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 if origin_feat is None:continue
                 feat_loss += criterion_mse(origin_feat,recon_feat)
-            loss = reg_loss + feat_loss
+            loss = feat_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
