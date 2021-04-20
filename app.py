@@ -257,7 +257,7 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             img = img.float()
-            print('a',img.device,gen_model.device,disc_model.device)
+            print('a',img.device,next(gen_model.parameters()).device,next(disc_model.parameters()).device)
             if half: img = img.cuda()
             print(img.device)
             # img = img.half() if half else img.float()  # uint8 to fp16/32
