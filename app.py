@@ -258,6 +258,7 @@ def deepcod_main():
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             img = img.float()
             if half: img = img.cuda()
+            print(img.device)
             # img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
