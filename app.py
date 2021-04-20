@@ -291,7 +291,7 @@ def deepcod_main():
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
-            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            out = non_max_suppression(origin_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
             # Statistics per image
@@ -343,10 +343,9 @@ def deepcod_main():
                                         break
 
                 # Append statistics (correct, conf, pcls, tcls)
-                stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+                stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
 
             metric = stat_to_map(stats,names,nc)
-
             train_iter.set_description(
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
@@ -354,19 +353,6 @@ def deepcod_main():
                 f"loss: {loss.cpu().item():.3f}")
         train_iter.close()
 
-        # # Compute statistics
-        # stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
-        # if len(stats) and stats[0].any():
-        #     p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, names=names)
-        #     ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
-        #     mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
-        #     nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
-        # else:
-        #     nt = torch.zeros(1)
-
-        # # Print results
-        # pf = '%20s' + '%12.3g' * 6  # print format
-        # print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
 def feature_main():
     PATH = 'backup/sf.pth'
@@ -756,7 +742,7 @@ def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
     return map50s,crs
 
 def stat_to_map(stats,names,nc):
-    mp, mr, map50 = 0.,0.,0.
+    mp, mr, map50, map = 0.,0.,0.,0.
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
         p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, names=names)
