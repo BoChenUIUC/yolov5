@@ -266,6 +266,7 @@ def deepcod_main():
             t = time_synchronized()
             recon = gen_model(img)
             # output of generated input
+            print('a',recon.device,next(gen_model.parameters()).device,next(disc_model.parameters()).device)
             recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
             # output of original input
             origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
@@ -288,7 +289,7 @@ def deepcod_main():
             if half:
                 targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
             else:
-                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)
+                targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
@@ -315,7 +316,7 @@ def deepcod_main():
                 if half:
                     correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
                 else:
-                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).to(device)
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
                 if nl:
                     detected = []  # target indices
                     tcls_tensor = labels[:, 0]
