@@ -17,7 +17,6 @@ def orthorgonal_regularizer(weight,scale,cuda=False):
 	w_mul = torch.matmul(weight, w_transpose)
 	identity = torch.diag(torch.ones(h))
 	identity = identity.repeat(cin*cout,1,1)
-	print(identity,w_mul)
 	if cuda:
 		identity = identity.cuda()
 	l2norm = torch.nn.MSELoss()
