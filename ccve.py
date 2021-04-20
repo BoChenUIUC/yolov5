@@ -88,7 +88,7 @@ def eval_metrics():
 			for line in f.readlines():
 				line = line.strip().split(' ')
 				acc,cr = float(line[0]),float(line[1])
-				pfs[ei].add(np.zeros(6),(acc,cr))
+				pfs[ei].add(np.zeros(7),(acc,cr))
 	for pf,name in zip(pfs,names):
 		print(name)
 		print(pf.area(0),pf.area(0.4),pf.uniformity())
@@ -588,15 +588,15 @@ def dual_train(net):
 
 
 def test():
-	from app import feature_main
-	feature_main()
+	from app import deepcod_main
+	deepcod_main()
 
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
 	# test dataloader
-	# test()
+	test()
 
 	# samples for eval
 	# generate_image_samples('Tiled')
@@ -627,8 +627,8 @@ if __name__ == "__main__":
 
 	# leave jpeg2000 for later
 	# former two can be evaluated directly without profile
-	for name in ['TiledLegacy']:
-		evaluation(name)
+	# for name in ['TiledLegacy']:
+	# 	evaluation(name)
 
 	# caculate metrics
 	# eval_metrics()

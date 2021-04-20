@@ -32,6 +32,7 @@ def get_model(opt):
     if device.type != 'cpu':
         model.cuda()
         model(torch.zeros(1, 3, opt.img_size, opt.img_size).to(device).type_as(next(model.parameters())))  # run once
+        
     return model
 
 def get_dataloader(opt,model):
@@ -219,6 +220,153 @@ class TwoLayer(nn.Module):
         x = F.tanh(x)
         x = x * 0.5 + 0.5
         return x
+
+def deepcod_main():
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer
+    sim_train = Simulator(train=True,use_model=True)
+    sim_test = Simulator(train=False,use_model=False)
+
+    opt = sim_train.opt
+    half = opt.device != 'cpu'
+    # data
+    test_loader = sim_test.dataloader
+    train_loader = sim_train.dataloader
+
+    # discriminator
+    disc_model = sim_train.model
+    if half: disc_model = disc_model.cuda()
+    disc_model.eval()
+
+    # encoder+decoder
+    gen_model = DeepCOD()
+    if half:gen_model = gen_model.cuda()
+    criterion_mse = nn.MSELoss()
+    optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+
+    for epoch in range(1,1001):
+        # train
+        gen_model.train()
+        iouv = torch.linspace(0.5, 0.95, 10)
+        if half:iouv = iouv.cuda()
+        niou = iouv.numel()
+        nc = sim_train.nc
+        seen = 0
+        names = {k: v for k, v in enumerate(disc_model.names if hasattr(disc_model, 'names') else disc_model.module.names)}
+        coco91class = coco80_to_coco91_class()
+        # s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
+        p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+        stats, ap, ap_class = [], [], []
+        train_iter = tqdm(train_loader)
+        for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
+            if batch_i == 10:break
+            if half: img = img.cuda()
+            img = img.half() if half else img.float()  # uint8 to fp16/32
+            img /= 255.0  # 0 - 255 to 0.0 - 1.0
+            if half:targets = targets.cuda()
+            nb, _, height, width = img.shape  # batch size, channels, height, width
+
+            # Run model
+            t = time_synchronized()
+            recon = gen_model(img)
+            # output of generated input
+            recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
+            # output of original input
+            origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
+            
+            t0 += time_synchronized() - t
+
+            # backprop
+            loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+            loss += criterion_mse(img,recon)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                if origin_feat is None:continue
+                loss += criterion_mse(origin_feat,recon_feat)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Run NMS
+            targets[:, 2:] *= torch.Tensor([width, height, width, height])
+            if half: targets = targets.cuda()
+
+            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
+            t = time_synchronized()
+            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            t1 += time_synchronized() - t
+
+            # Statistics per image
+            for si, pred in enumerate(out):
+                labels = targets[targets[:, 0] == si, 1:]
+                nl = len(labels)
+                tcls = labels[:, 0].tolist() if nl else []  # target class
+                seen += 1
+
+                if len(pred) == 0:
+                    if nl:
+                        stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
+                    continue
+
+                # Predictions
+                predn = pred.clone()
+                scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
+
+                # Assign all predictions as incorrect
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+                if half:correct = correct.cuda()
+                if nl:
+                    detected = []  # target indices
+                    tcls_tensor = labels[:, 0]
+
+                    # target boxes
+                    tbox = xywh2xyxy(labels[:, 1:5])
+                    scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+
+                    # Per target class
+                    for cls in torch.unique(tcls_tensor):
+                        ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
+                        pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
+
+                        # Search for detections
+                        if pi.shape[0]:
+                            # Prediction to target ious
+                            ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
+
+                            # Append detections
+                            detected_set = set()
+                            for j in (ious > iouv[0]).nonzero(as_tuple=False):
+                                d = ti[i[j]]  # detected target
+                                if d.item() not in detected_set:
+                                    detected_set.add(d.item())
+                                    detected.append(d)
+                                    correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+                                    if len(detected) == nl:  # all targets already located in image
+                                        break
+
+                # Append statistics (correct, conf, pcls, tcls)
+                stats.append((correct.cpu(), pred[:, 4].cpu(), pred[:, 5].cpu(), tcls))
+
+            metric = stat_to_map(stats,names,nc)
+
+            train_iter.set_description(
+                f"Train: {epoch:3}. "
+                f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                f"loss: {loss.cpu().item():.3f}")
+        train_iter.close()
+
+        # # Compute statistics
+        # stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
+        # if len(stats) and stats[0].any():
+        #     p, r, ap, f1, ap_class = ap_per_class(*stats, plot=False, names=names)
+        #     ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+        #     mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+        #     nt = np.bincount(stats[3].astype(np.int64), minlength=nc)  # number of targets per class
+        # else:
+        #     nt = torch.zeros(1)
+
+        # # Print results
+        # pf = '%20s' + '%12.3g' * 6  # print format
+        # print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
 def feature_main():
     PATH = 'backup/sf.pth'
@@ -676,40 +824,3 @@ if __name__ == '__main__':
     sim = Simulator()
     r = sim.get_one_point((0,10))
     print(r)
-    # opt = setup_opt()
-    # print(opt)
-
-    # if opt.task in ['val', 'test']:  # run normally
-    #     test(opt.data,
-    #          opt.weights,
-    #          opt.batch_size,
-    #          opt.img_size,
-    #          opt.conf_thres,
-    #          opt.iou_thres,
-    #          opt.save_json,
-    #          opt.single_cls,
-    #          opt.augment,
-    #          opt.verbose,
-    #          save_txt=opt.save_txt | opt.save_hybrid,
-    #          save_hybrid=opt.save_hybrid,
-    #          save_conf=opt.save_conf,
-    #          )
-
-    # elif opt.task == 'speed':  # speed benchmarks
-    #     for w in opt.weights:
-    #         test(opt.data, w, opt.batch_size, opt.img_size, 0.25, 0.45, save_json=False, plots=False)
-
-    # elif opt.task == 'study':  # run over a range of settings and save/plot
-    #     # python test.py --task study --data coco.yaml --iou 0.7 --weights yolov5s.pt yolov5m.pt yolov5l.pt yolov5x.pt
-    #     x = list(range(256, 1536 + 128, 128))  # x axis (image sizes)
-    #     for w in opt.weights:
-    #         f = f'study_{Path(opt.data).stem}_{Path(w).stem}.txt'  # filename to save to
-    #         y = []  # y axis
-    #         for i in x:  # img-size
-    #             print(f'\nRunning {f} point {i}...')
-    #             r, _, t = test(opt.data, w, opt.batch_size, i, opt.conf_thres, opt.iou_thres, opt.save_json,
-    #                            plots=False)
-    #             y.append(r + t)  # results and times
-    #         np.savetxt(f, y, fmt='%10.4g')  # save
-    #     os.system('zip -r study.zip study_*.txt')
-    #     plot_study_txt(x=x)  # plot
