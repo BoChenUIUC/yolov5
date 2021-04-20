@@ -140,7 +140,7 @@ class Model(nn.Module):
         if profile:
             print('%.1fms total' % sum(dt))
         if inter_feature:
-            return *x,y
+            return x[0],x[1],y
         return x
 
     def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency
