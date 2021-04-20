@@ -275,13 +275,11 @@ def deepcod_main():
             t0 += time_synchronized() - t
 
             # backprop
-            loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-            print(loss)
+            loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,half)
             loss += criterion_mse(img,recon)
-            print(loss)
-            # for origin_feat,recon_feat in zip(origin_features,recon_features):
-            #     if origin_feat is None:continue
-            #     loss += criterion_mse(origin_feat,recon_feat)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                if origin_feat is None:continue
+                loss += criterion_mse(origin_feat,recon_feat)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
