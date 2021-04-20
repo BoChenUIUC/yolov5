@@ -26,8 +26,8 @@ def get_model(opt):
     model = attempt_load(opt.weights, map_location=device)  # load FP32 model
     # Half
     half = device.type != 'cpu'  # half precision only supported on CUDA
-    # if half:
-    #     model.half()
+    if half:
+        model.half()
     model.eval()
     if device.type != 'cpu':
         model.cuda()
@@ -234,12 +234,12 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
-    if half: disc_model = disc_model.cuda()
+    if half: disc_model = disc_model.half().cuda()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
-    if half:gen_model = gen_model.cuda()
+    if half:gen_model = gen_model.half().cuda()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -259,24 +259,29 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             if half: img = img.cuda()
-            img = img.float()  # uint8 to fp16/32
+            img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # Run model
+            t = time_synchronized()
             recon = gen_model(img)
             # output of generated input
             recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
             # output of original input
             origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
+            
+            t0 += time_synchronized() - t
 
             # backprop
-            # loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-            loss = criterion_mse(img,recon)
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+            # recon_loss = criterion_mse(img,recon)
+            feat_loss = 0
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 if origin_feat is None:continue
-                loss += criterion_mse(origin_feat,recon_feat)
+                feat_loss += criterion_mse(origin_feat,recon_feat)
+            loss = reg_loss + feat_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -288,9 +293,9 @@ def deepcod_main():
                 targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
-
+            t = time_synchronized()
             out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
-
+            t1 += time_synchronized() - t
 
             # Statistics per image
             for si, pred in enumerate(out):
@@ -350,7 +355,9 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}")
+                f"loss: {loss.cpu().item():.3f}. "
+                f"reg_loss: {reg_loss.cpu().item():.6f}. "
+                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
         train_iter.close()
 
 
