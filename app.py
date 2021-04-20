@@ -267,7 +267,7 @@ def deepcod_main():
             t = time_synchronized()
             recon = gen_model(img)
             # output of generated input
-            # recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
+            recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
             # output of original input
             origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
             
