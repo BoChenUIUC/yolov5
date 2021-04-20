@@ -354,9 +354,9 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.6f}. "
-                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+                f"loss: {loss.cpu().item():.3f}. ")
+                # f"reg_loss: {reg_loss.cpu().item():.6f}. "
+                # f"feat_loss: {feat_loss.cpu().item():.3f}. ")
         train_iter.close()
 
 
