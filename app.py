@@ -276,10 +276,10 @@ def deepcod_main():
 
             # backprop
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-            # loss += criterion_mse(img,recon)
-            # for origin_feat,recon_feat in zip(origin_features,recon_features):
-                # if origin_feat is None:continue
-                # loss += criterion_mse(origin_feat,recon_feat)
+            loss = criterion_mse(img,recon)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                if origin_feat is None:continue
+                loss += criterion_mse(origin_feat,recon_feat)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -288,7 +288,7 @@ def deepcod_main():
             if half:
                 targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
             else:
-                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)
+                targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
@@ -315,7 +315,7 @@ def deepcod_main():
                 if half:
                     correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
                 else:
-                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
                 if nl:
                     detected = []  # target indices
                     tcls_tensor = labels[:, 0]
