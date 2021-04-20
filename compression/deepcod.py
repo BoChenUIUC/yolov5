@@ -14,7 +14,7 @@ def orthorgonal_regularizer(weight,scale,cuda=False):
 	cin,cout,h,w = weight.size()
 	weight = weight.view(cin*cout, h, w)
 	w_transpose = torch.transpose(weight, 1, 2)
-	print(weight,w_transpose)
+	print('w',weight,'wt',w_transpose)
 	w_mul = torch.matmul(weight, w_transpose)
 	identity = torch.diag(torch.ones(h))
 	identity = identity.repeat(cin*cout,1,1)
