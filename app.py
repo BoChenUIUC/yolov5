@@ -26,8 +26,8 @@ def get_model(opt):
     model = attempt_load(opt.weights, map_location=device)  # load FP32 model
     # Half
     half = device.type != 'cpu'  # half precision only supported on CUDA
-    # if half:
-    #     model.half()
+    if half:
+        model.half()
     model.eval()
     if device.type != 'cpu':
         model.cuda()
@@ -234,12 +234,12 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
-    if half: disc_model = disc_model.cuda()
+    if half: disc_model = disc_model.half().cuda()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
-    if half:gen_model = gen_model.cuda()
+    if half:gen_model = gen_model.half().cuda()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -260,7 +260,7 @@ def deepcod_main():
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             if batch_i == 10:break
             if half: img = img.cuda()
-            img = img.float()  # uint8 to fp16/32
+            img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
@@ -277,10 +277,13 @@ def deepcod_main():
 
             # backprop
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+            print(loss.type())
             loss += criterion_mse(img,recon)
+            print(loss.type())
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 if origin_feat is None:continue
                 loss += criterion_mse(origin_feat,recon_feat)
+            print(loss.type())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
