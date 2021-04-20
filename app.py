@@ -221,13 +221,13 @@ class TwoLayer(nn.Module):
 def deepcod_main():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer
     sim_train = Simulator(train=False,use_model=True)
-    sim_test = Simulator(train=False,use_model=False)
+    # sim_test = Simulator(train=False,use_model=False)
 
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
     # data
-    test_loader = sim_test.dataloader
+    # test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
 
     # discriminator
@@ -277,9 +277,9 @@ def deepcod_main():
             reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
             # recon_loss = criterion_mse(img,recon)
             feat_loss = 0
-            # for origin_feat,recon_feat in zip(origin_features,recon_features):
-            #     if origin_feat is None:continue
-            #     feat_loss += criterion_mse(origin_feat,recon_feat)
+            for origin_feat,recon_feat in zip(origin_features,recon_features):
+                if origin_feat is None:continue
+                feat_loss += criterion_mse(origin_feat,recon_feat)
             loss = reg_loss + feat_loss
             optimizer.zero_grad()
             loss.backward()
@@ -354,9 +354,9 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. ")
-                # f"reg_loss: {reg_loss.cpu().item():.6f}. "
-                # f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+                f"loss: {loss.cpu().item():.3f}. "
+                f"reg_loss: {reg_loss.cpu().item():.6f}. "
+                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
         train_iter.close()
 
 
