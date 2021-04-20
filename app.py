@@ -260,6 +260,7 @@ def deepcod_main():
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             if half: img = img.cuda()
             img = img.half() if half else img.float()  # uint8 to fp16/32
+            print(img.type())
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
