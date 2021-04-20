@@ -28,9 +28,8 @@ def get_model(opt):
     half = device.type != 'cpu'  # half precision only supported on CUDA
     # if half:
     #     model.half()
+    model.to(device)
     model.eval()
-    if device.type != 'cpu':
-        model.cuda()
     return model
 
 def get_dataloader(opt,model):
@@ -225,6 +224,7 @@ def deepcod_main():
     sim_test = Simulator(train=False,use_model=False)
 
     opt = sim_train.opt
+    device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
     # data
     test_loader = sim_test.dataloader
@@ -232,12 +232,11 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
-    if half: disc_model = disc_model.cuda()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
-    if half:gen_model = gen_model.cuda()
+    gen_model.to(device)
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -245,7 +244,7 @@ def deepcod_main():
         # train
         gen_model.train()
         iouv = torch.linspace(0.5, 0.95, 10)
-        if half:iouv = iouv.cuda()
+        if half:iouv = iouv.to(device)
         niou = iouv.numel()
         nc = sim_train.nc
         seen = 0
@@ -257,12 +256,10 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             img = img.float()
-            print('a',img.device,next(gen_model.parameters()).device,next(disc_model.parameters()).device)
-            if half: img = img.cuda()
-            print(img.device)
+            if half: img = img.to(device)
             # img = img.half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            if half:targets = targets.cuda()
+            if half:targets = targets.to(device)
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # Run model
@@ -291,7 +288,7 @@ def deepcod_main():
             if half:
                 targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
             else:
-                targets[:, 2:] *= torch.Tensor([width, height, width, height])
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
@@ -318,7 +315,7 @@ def deepcod_main():
                 if half:
                     correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
                 else:
-                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).to(device)
                 if nl:
                     detected = []  # target indices
                     tcls_tensor = labels[:, 0]
