@@ -277,20 +277,19 @@ def deepcod_main():
 
             # backprop
             loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-            print(loss.type())
             loss += criterion_mse(img,recon)
-            print(loss.type())
             for origin_feat,recon_feat in zip(origin_features,recon_features):
                 if origin_feat is None:continue
                 loss += criterion_mse(origin_feat,recon_feat)
-            print(loss.type())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             # Run NMS
-            targets[:, 2:] *= torch.Tensor([width, height, width, height])
-            if half: targets = targets.cuda()
+            if half:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+            else:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
@@ -314,8 +313,10 @@ def deepcod_main():
                 scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
 
                 # Assign all predictions as incorrect
-                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
-                if half:correct = correct.cuda()
+                if half:
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+                else:
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
                 if nl:
                     detected = []  # target indices
                     tcls_tensor = labels[:, 0]
