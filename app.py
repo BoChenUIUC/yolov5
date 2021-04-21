@@ -358,7 +358,6 @@ def deepcod_main():
                 f"loss: {loss.cpu().item():.3f}. "
                 f"reg_loss: {reg_loss.cpu().item():.6f}. "
                 f"feat_loss: {feat_loss.cpu().item():.3f}. ")
-            break
         train_iter.close()
 
         # eval
@@ -464,7 +463,6 @@ def deepcod_main():
                 f"loss: {loss.cpu().item():.3f}. "
                 f"reg_loss: {reg_loss.cpu().item():.6f}. "
                 f"feat_loss: {feat_loss.cpu().item():.3f}. ")
-            break
         test_iter.close()
 
 
