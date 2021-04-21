@@ -232,13 +232,21 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
-    if half:disc_model = disc_model.cuda().half()
+    if half:
+        disc_model = disc_model.cuda().half()
+        for layer in disc_model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
-    if half:gen_model = gen_model.cuda().half()
+    if half:
+        gen_model = gen_model.cuda().half()
+        for layer in gen_model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
