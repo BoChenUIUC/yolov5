@@ -270,7 +270,6 @@ def deepcod_main():
         stats, ap, ap_class = [], [], []
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
-            if batch_i == 5000:break
             img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
@@ -288,7 +287,7 @@ def deepcod_main():
                 t0 += time_synchronized() - t
 
                 # backprop
-                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,half)
+                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
                 recon_loss = criterion_mse(img,recon)
                 feat_loss = 0
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
