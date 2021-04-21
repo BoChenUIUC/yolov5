@@ -220,14 +220,14 @@ class TwoLayer(nn.Module):
 
 def deepcod_main():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
-    sim_train = Simulator(train=False,use_model=True)
-    # sim_test = Simulator(train=False,use_model=False)
+    sim_train = Simulator(train=True,use_model=True)
+    sim_test = Simulator(train=False,use_model=False)
 
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
     # data
-    # test_loader = sim_test.dataloader
+    test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
 
     # discriminator
@@ -358,7 +358,114 @@ def deepcod_main():
                 f"loss: {loss.cpu().item():.3f}. "
                 f"reg_loss: {reg_loss.cpu().item():.6f}. "
                 f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+            break
         train_iter.close()
+
+        # eval
+        if epoch%5!=0:continue
+        gen_model.eval()
+        if half:
+            iouv = torch.linspace(0.5, 0.95, 10).cuda()
+        else:
+            iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+        niou = iouv.numel()
+        nc = sim_test.nc
+        seen = 0
+        names = {k: v for k, v in enumerate(disc_model.names if hasattr(disc_model, 'names') else disc_model.module.names)}
+        coco91class = coco80_to_coco91_class()
+        # s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
+        p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+        stats, ap, ap_class = [], [], []
+        test_iter = tqdm(test_loader)
+        for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
+            img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
+            img /= 255.0  # 0 - 255 to 0.0 - 1.0
+            if half:targets = targets.cuda()
+            nb, _, height, width = img.shape  # batch size, channels, height, width
+
+            # Run model
+            t = time_synchronized()
+            with torch.no_grad():
+                img = gen_model(img)
+                # output of generated input
+                recon_out, _, _ = disc_model(img, augment=opt.augment, inter_feature=True)
+                
+            t0 += time_synchronized() - t
+
+            # Run NMS
+            if half:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+            else:
+                targets[:, 2:] *= torch.Tensor([width, height, width, height])
+
+            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
+            t = time_synchronized()
+            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            t1 += time_synchronized() - t
+
+            # Statistics per image
+            for si, pred in enumerate(out):
+                labels = targets[targets[:, 0] == si, 1:]
+                nl = len(labels)
+                tcls = labels[:, 0].tolist() if nl else []  # target class
+                seen += 1
+
+                if len(pred) == 0:
+                    if nl:
+                        stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
+                    continue
+
+                # Predictions
+                predn = pred.clone()
+                scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
+
+                # Assign all predictions as incorrect
+                if half:
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+                else:
+                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+                if nl:
+                    detected = []  # target indices
+                    tcls_tensor = labels[:, 0]
+
+                    # target boxes
+                    tbox = xywh2xyxy(labels[:, 1:5])
+                    scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+
+                    # Per target class
+                    for cls in torch.unique(tcls_tensor):
+                        ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
+                        pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
+
+                        # Search for detections
+                        if pi.shape[0]:
+                            # Prediction to target ious
+                            ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
+
+                            # Append detections
+                            detected_set = set()
+                            for j in (ious > iouv[0]).nonzero(as_tuple=False):
+                                d = ti[i[j]]  # detected target
+                                if d.item() not in detected_set:
+                                    detected_set.add(d.item())
+                                    detected.append(d)
+                                    correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+                                    if len(detected) == nl:  # all targets already located in image
+                                        break
+
+                # Append statistics (correct, conf, pcls, tcls)
+                stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
+
+            metric = stat_to_map(stats,names,nc)
+            test_iter.set_description(
+                f"Test: {epoch:3}. "
+                f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                f"loss: {loss.cpu().item():.3f}. "
+                f"reg_loss: {reg_loss.cpu().item():.6f}. "
+                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+            break
+        test_iter.close()
 
 
 def feature_main():
