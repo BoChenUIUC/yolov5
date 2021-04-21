@@ -259,6 +259,7 @@ def deepcod_main():
         stats, ap, ap_class = [], [], []
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
+            if batch_i == 5000:break
             img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
@@ -361,7 +362,6 @@ def deepcod_main():
         train_iter.close()
 
         # eval
-        if epoch%5!=0:continue
         gen_model.eval()
         if half:
             iouv = torch.linspace(0.5, 0.95, 10).cuda()
