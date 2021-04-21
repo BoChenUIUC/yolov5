@@ -232,13 +232,13 @@ def deepcod_main():
 
     # discriminator
     disc_model = sim_train.model
-    if half:disc_model = disc_model.cuda()
+    if half:disc_model = disc_model.cuda().half()
     disc_model.eval()
 
     # encoder+decoder
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
-    if half:gen_model = gen_model.cuda()
+    if half:gen_model = gen_model.cuda().half()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -260,7 +260,7 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             if batch_i == 5000:break
-            img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
+            img = img.type(torch.FloatTensor).cuda().half() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
