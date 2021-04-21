@@ -54,8 +54,8 @@ class Attention(nn.Module):
 		h = (self.h_conv(x)).view(nb,self.hidden_channels,-1)
 
 		s = torch.matmul(f.transpose(1,2),g)
-		beta = F.softmax(s, dim=-1)
-		o = torch.matmul(beta,h.transpose(1,2))
+		s = F.softmax(s, dim=-1)
+		o = torch.matmul(s,h.transpose(1,2))
 		o = self.v_conv(o.transpose(1,2).view(nb,self.hidden_channels,imgh,imgw))
 		x = self.gamma * o + x
 
