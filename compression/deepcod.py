@@ -17,7 +17,7 @@ def orthorgonal_regularizer(w,scale,cuda=False):
 	ones = torch.ones(N * C, H, H, dtype=torch.float32)
 	diag = torch.eye(H, dtype=torch.float32)
 	tmp = ones - diag
-	if cuda:tmp = tmp.cuda().half()
+	if cuda:tmp = tmp.cuda()
 	loss_orth = ((weight_squared * tmp) ** 2).sum()
 	return loss_orth*scale
 	# w_transpose = torch.transpose(w, 1, 2)
@@ -174,6 +174,8 @@ if __name__ == '__main__':
 	print(model.sample.weight.size())
 	r = orthorgonal_regularizer(model.sample.weight,1,False)
 	print(r)
+	for l in (model.modules()):
+		print(l)
 	# for name, param in model.named_parameters():
 	# 	print('name is {}'.format(name))
 	# 	print('shape is {}'.format(param.shape))

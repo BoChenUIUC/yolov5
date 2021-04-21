@@ -18,6 +18,7 @@ from utils.metrics import ap_per_class, ConfusionMatrix
 # from utils.plots import plot_images, output_to_target, plot_study_txt
 from utils.torch_utils import select_device, time_synchronized
 import time
+from torch.cuda.amp import autocast as autocast
 
 def get_model(opt):
     device = select_device(opt.device, batch_size=opt.batch_size)
@@ -233,7 +234,7 @@ def deepcod_main():
     # discriminator
     disc_model = sim_train.model
     if half:
-        disc_model = disc_model.cuda().half()
+        disc_model = disc_model.cuda()
         for layer in disc_model.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
@@ -243,10 +244,12 @@ def deepcod_main():
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
     if half:
-        gen_model = gen_model.cuda().half()
+        gen_model = gen_model.cuda()
         for layer in gen_model.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
+
+    scaler = torch.cuda.amp.GradScaler(enabled=half)
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
@@ -268,32 +271,37 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             if batch_i == 5000:break
-            img = img.type(torch.FloatTensor).cuda().half() if half else img.float()  # uint8 to fp16/32
+            img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
-            # Run model
-            t = time_synchronized()
-            recon = gen_model(img)
-            # output of generated input
-            recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
-            # output of original input
-            origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
-            
-            t0 += time_synchronized() - t
+            with autocast():
+                # Run model
+                t = time_synchronized()
+                recon = gen_model(img)
+                # output of generated input
+                recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
+                # output of original input
+                origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
+                
+                t0 += time_synchronized() - t
 
-            # backprop
-            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,half)
-            # recon_loss = criterion_mse(img,recon)
-            feat_loss = 0
-            for origin_feat,recon_feat in zip(origin_features,recon_features):
-                if origin_feat is None:continue
-                feat_loss += criterion_mse(origin_feat,recon_feat)
-            loss = reg_loss + feat_loss
+                # backprop
+                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,half)
+                recon_loss = criterion_mse(img,recon)
+                feat_loss = 0
+                for origin_feat,recon_feat in zip(origin_features,recon_features):
+                    if origin_feat is None:continue
+                    feat_loss += criterion_mse(origin_feat,recon_feat)
+                loss = reg_loss + feat_loss + recon_loss
+
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            # loss.backward()
+            # optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             # Run NMS
             if half:
