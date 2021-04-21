@@ -219,7 +219,7 @@ class TwoLayer(nn.Module):
         return x
 
 def deepcod_main():
-    from compression.deepcod import DeepCOD, orthorgonal_regularizer
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=False,use_model=True)
     # sim_test = Simulator(train=False,use_model=False)
 
@@ -237,6 +237,7 @@ def deepcod_main():
 
     # encoder+decoder
     gen_model = DeepCOD()
+    gen_model.apply(init_weights)
     if half:gen_model = gen_model.cuda()
     criterion_mse = nn.MSELoss()
     optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
@@ -274,7 +275,7 @@ def deepcod_main():
             t0 += time_synchronized() - t
 
             # backprop
-            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+            reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.1,half)
             # recon_loss = criterion_mse(img,recon)
             feat_loss = 0
             for origin_feat,recon_feat in zip(origin_features,recon_features):
