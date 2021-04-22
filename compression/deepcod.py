@@ -66,24 +66,21 @@ class Resblock_up(nn.Module):
 	def __init__(self, in_channels, out_channels):
 		super(Resblock_up, self).__init__()
 		self.bn1 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
-		self.relu1 = nn.LeakyReLU()
 		deconv1 = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv1 = spectral_norm(deconv1)
 
 		self.bn2 = nn.BatchNorm2d(out_channels, momentum=0.01, eps=1e-3)
-		self.relu2 = nn.LeakyReLU()
 		deconv2 = nn.ConvTranspose2d(out_channels, out_channels, 3, stride=1, padding=1)
 		self.deconv2 = spectral_norm(deconv2)
 
 		self.bn3 = nn.BatchNorm2d(in_channels, momentum=0.01, eps=1e-3)
-		self.relu3 = nn.LeakyReLU()
 		deconv_skip = nn.ConvTranspose2d(in_channels, out_channels, 4, stride=2, padding=1)
 		self.deconv_skip = spectral_norm(deconv_skip)
 
 	def forward(self, x_init):
-		x = self.deconv1(self.relu1(self.bn1(x_init)))
-		x = self.deconv2(self.relu2(self.bn2(x)))
-		x_init = self.deconv_skip(self.relu3(self.bn3(x_init)))
+		x = self.deconv1(F.relu(self.bn1(x_init)))
+		x = self.deconv2(F.relu(self.bn2(x)))
+		x_init = self.deconv_skip(F.relu(self.bn3(x_init)))
 		return x + x_init
 
 class Middle_conv(nn.Module):
@@ -91,12 +88,11 @@ class Middle_conv(nn.Module):
 	def __init__(self, channels):
 		super(Middle_conv, self).__init__()
 		self.bn = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu = nn.LeakyReLU()
 		self.conv = nn.Conv2d(channels, channels, kernel_size=3, stride=1, padding=1, bias=True)
 		self.conv = spectral_norm(self.conv)
 
 	def forward(self, x):
-		x = self.conv(self.relu(self.bn(x)))
+		x = self.conv(F.relu(self.bn(x)))
 
 		return x
 
@@ -105,12 +101,11 @@ class Output_conv(nn.Module):
 	def __init__(self, channels):
 		super(Output_conv, self).__init__()
 		self.bn = nn.BatchNorm2d(channels, momentum=0.01, eps=1e-3)
-		self.relu = nn.LeakyReLU()#nn.ReLU(inplace=True)
 		self.conv = nn.Conv2d(channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
 		self.conv = spectral_norm(self.conv)
 
 	def forward(self, x):
-		x = self.conv(self.relu(self.bn(x)))
+		x = self.conv(F.relu(self.bn(x)))
 		x = torch.tanh(x)
 		x = (x+1)/2
 
@@ -131,9 +126,10 @@ class DeepCOD(nn.Module):
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.rand(num_centers)
 		self.centers = torch.nn.Parameter(self.centers)
-		self.attention_1 = Attention(out_size,out_size)
+		# self.attention_1 = Attention(out_size,out_size)
+		self.middle_conv1 = Middle_conv(out_size)
 		self.resblock_up1 = Resblock_up(out_size,64)
-		self.middle_conv = Middle_conv(64)
+		self.middle_conv2 = Middle_conv(64)
 		# self.attention_2 =Attention(64,64//8)
 		self.resblock_up2 = Resblock_up(64,32)
 		self.output_conv = Output_conv(32)
@@ -151,13 +147,14 @@ class DeepCOD(nn.Module):
 		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
 		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
 		# dont know how to use hardout, use this temporarily
-		x = softout + (hardout - softout).detach()
+		x = softout
 
 		# reconstruct
-		x = self.attention_1(x)
+		# x = self.attention_1(x)
+		x = self.middle_conv1(x)
 		x = self.resblock_up1(x)
 		# x = self.attention_2(x)
-		x = self.middle_conv(x)
+		x = self.middle_conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		

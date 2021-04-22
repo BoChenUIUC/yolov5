@@ -19,6 +19,7 @@ from utils.metrics import ap_per_class, ConfusionMatrix
 from utils.torch_utils import select_device, time_synchronized
 import time
 from torch.cuda.amp import autocast as autocast
+from utils.loss import ComputeLoss
 
 def get_model(opt):
     device = select_device(opt.device, batch_size=opt.batch_size)
@@ -239,6 +240,7 @@ def deepcod_main():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
     disc_model.eval()
+    compute_loss = ComputeLoss(disc_model)
 
     # encoder+decoder
     gen_model = DeepCOD()
@@ -280,20 +282,21 @@ def deepcod_main():
                 t = time_synchronized()
                 recon = gen_model(img)
                 # output of generated input
-                recon_out, _, recon_features = disc_model(recon, augment=opt.augment, inter_feature=True)
-                # output of original input
-                origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
+                pred = disc_model(recon, augment=opt.augment)
+                # # output of original input
+                # origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
                 
                 t0 += time_synchronized() - t
 
                 # backprop
                 reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-                recon_loss = criterion_mse(img,recon)
-                feat_loss = 0
-                for origin_feat,recon_feat in zip(origin_features,recon_features):
-                    if origin_feat is None:continue
-                    feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = reg_loss + feat_loss + recon_loss
+                yolo_loss, _ = compute_loss(pred[1], targets)
+                # recon_loss = criterion_mse(img,recon)
+                # feat_loss = 0
+                # for origin_feat,recon_feat in zip(origin_features,recon_features):
+                #     if origin_feat is None:continue
+                #     feat_loss += criterion_mse(origin_feat,recon_feat)
+                loss = reg_loss + yolo_loss
 
             optimizer.zero_grad()
             # loss.backward()
@@ -310,7 +313,7 @@ def deepcod_main():
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
-            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
             # Statistics per image
@@ -371,9 +374,7 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.6f}. "
-                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+                f"loss: {loss.cpu().item():.3f}. ")
         train_iter.close()
 
         # eval
@@ -402,7 +403,11 @@ def deepcod_main():
             with torch.no_grad():
                 img = gen_model(img)
                 # output of generated input
-                recon_out, _, _ = disc_model(img, augment=opt.augment, inter_feature=True)
+                pred = disc_model(img, augment=opt.augment)
+
+                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+                yolo_loss, _ = compute_loss(pred[1], targets)
+                loss = reg_loss + yolo_loss
                 
             t0 += time_synchronized() - t
 
@@ -414,7 +419,7 @@ def deepcod_main():
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
             t = time_synchronized()
-            out = non_max_suppression(recon_out, conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+            out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
             # Statistics per image
@@ -475,9 +480,7 @@ def deepcod_main():
                 f"Test: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. "
-                f"reg_loss: {reg_loss.cpu().item():.6f}. "
-                f"feat_loss: {feat_loss.cpu().item():.3f}. ")
+                f"loss: {loss.cpu().item():.3f}. ")
         test_iter.close()
 
 
