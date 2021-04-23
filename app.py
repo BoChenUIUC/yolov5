@@ -221,7 +221,7 @@ class TwoLayer(nn.Module):
         return x
 
 def deepcod_main():
-    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
 
@@ -232,15 +232,15 @@ def deepcod_main():
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
 
-    # discriminator
-    disc_model = sim_train.model
+    # vision app
+    app_model = sim_train.model
     if half:
-        disc_model = disc_model.cuda()
-        for layer in disc_model.modules():
+        app_model = app_model.cuda()
+        for layer in app_model.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
-    disc_model.eval()
-    compute_loss = ComputeLoss(disc_model)
+    app_model.eval()
+    compute_loss = ComputeLoss(app_model)
 
     # encoder+decoder
     gen_model = DeepCOD()
@@ -251,13 +251,24 @@ def deepcod_main():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
 
-    scaler = torch.cuda.amp.GradScaler(enabled=half)
-    criterion_mse = nn.MSELoss()
-    optimizer = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+    # discriminator
+    lambda_gp = 10
+    discriminator = Discriminator()
+    if half:
+        discriminator = discriminator.cuda()
 
+    criterion_mse = nn.MSELoss()
+    scaler_g = torch.cuda.amp.GradScaler(enabled=half)
+    scaler_d = torch.cuda.amp.GradScaler(enabled=half)
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+    optimizer_d = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
+
+    with open('training.log','a') as f:
+        f.write('-----------start---------')
     for epoch in range(1,101):
         # train
         gen_model.train()
+        discriminator.train()
         if half:
             iouv = torch.linspace(0.5, 0.95, 10).cuda()
         else:
@@ -265,10 +276,10 @@ def deepcod_main():
         niou = iouv.numel()
         nc = sim_train.nc
         seen = 0
-        names = {k: v for k, v in enumerate(disc_model.names if hasattr(disc_model, 'names') else disc_model.module.names)}
+        names = {k: v for k, v in enumerate(app_model.names if hasattr(app_model, 'names') else app_model.module.names)}
         coco91class = coco80_to_coco91_class()
         # s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
-        p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+        p, r, f1, mp, mr, map50, map, = 0., 0., 0., 0., 0., 0., 0.
         stats, ap, ap_class = [], [], []
         train_iter = tqdm(train_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
@@ -277,33 +288,44 @@ def deepcod_main():
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
+            # generator update
+            for p in discriminator.parameters():
+                p.requires_grad_(False)
+            optimizer_g.zero_grad()
             with autocast():
-                # Run model
-                t = time_synchronized()
                 recon = gen_model(img)
-                # output of generated input
-                pred = disc_model(recon, augment=opt.augment)
-                # # output of original input
-                # origin_out, _, origin_features = disc_model(img, augment=opt.augment, inter_feature=True)
-                
-                t0 += time_synchronized() - t
-
-                # backprop
-                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
-                yolo_loss, _ = compute_loss(pred[1], targets)
-                # recon_loss = criterion_mse(img,recon)
+                pred = app_model(recon, augment=opt.augment)
+                fake_validity = discriminator(recon)
+                loss0, _ = compute_loss(pred[1], targets)
+                loss0 += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                loss_g = loss0 - torch.mean(fake_validity)
                 # feat_loss = 0
                 # for origin_feat,recon_feat in zip(origin_features,recon_features):
                 #     if origin_feat is None:continue
                 #     feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss = reg_loss + yolo_loss
 
-            optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            scaler_g.scale(loss_d).backward()
+            scaler_g.step(optimizer_g)
+            scaler_g.update()
+            for p in discriminator.parameters():
+                p.requires_grad_(True)
+
+            # discriminator update
+            optimizer_d.zero_grad()
+            with autocast():
+                # real images
+                real_validity = discriminator(img)
+                # fake images
+                fake_imgs = gen_model(img)
+                fake_validity = discriminator(fake_imgs)
+                # Gradient penalty
+                gradient_penalty = compute_gradient_penalty(discriminator, img.data, fake_imgs.data, half)
+                # Adversarial loss
+                loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
+
+            scaler_d.scale(loss_d).backward()
+            scaler_d.step(optimizer_d)
+            scaler_d.update()
 
             # Run NMS
             if half:
@@ -312,9 +334,9 @@ def deepcod_main():
                 targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
-            t = time_synchronized()
+
             out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
-            t1 += time_synchronized() - t
+
 
             # Statistics per image
             for si, pred in enumerate(out):
@@ -374,7 +396,11 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. ")
+                f"loss_d: {loss_d.cpu().item():.3f}. "
+                f"loss_g: {loss_g.cpu().item():.3f}. "
+                f"loss0: {loss0.cpu().item():.3f}. "
+                )
+            break
         train_iter.close()
 
         # eval
@@ -386,10 +412,10 @@ def deepcod_main():
         niou = iouv.numel()
         nc = sim_test.nc
         seen = 0
-        names = {k: v for k, v in enumerate(disc_model.names if hasattr(disc_model, 'names') else disc_model.module.names)}
+        names = {k: v for k, v in enumerate(app_model.names if hasattr(app_model, 'names') else app_model.module.names)}
         coco91class = coco80_to_coco91_class()
         # s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
-        p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
+        p, r, f1, mp, mr, map50, map = 0., 0., 0., 0., 0., 0., 0.
         stats, ap, ap_class = [], [], []
         test_iter = tqdm(test_loader)
         for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
@@ -399,17 +425,15 @@ def deepcod_main():
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # Run model
-            t = time_synchronized()
             with torch.no_grad():
                 img = gen_model(img)
                 # output of generated input
-                pred = disc_model(img, augment=opt.augment)
+                pred = app_model(img, augment=opt.augment)
 
                 reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
                 yolo_loss, _ = compute_loss(pred[1], targets)
                 loss = reg_loss + yolo_loss
                 
-            t0 += time_synchronized() - t
 
             # Run NMS
             if half:
@@ -418,9 +442,9 @@ def deepcod_main():
                 targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
             lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
-            t = time_synchronized()
+
             out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
-            t1 += time_synchronized() - t
+
 
             # Statistics per image
             for si, pred in enumerate(out):
@@ -481,7 +505,14 @@ def deepcod_main():
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                 f"loss: {loss.cpu().item():.3f}. ")
+            break
         test_iter.close()
+        torch.save(gen_model.state_dict(), PATH)
+        with open('training.log','a') as f:
+            f.write(f"Test: {epoch:3}. "
+                    f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                    f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                    f"loss: {loss.cpu().item():.3f}. \n")
 
 
 def feature_main():
@@ -511,7 +542,7 @@ def feature_trainer(dataloader,net,half,epoch):
     tp,gt,dt = 0.0,0.0,0.0
     toMacroBlock = nn.MaxPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=True)
     criterion = nn.BCELoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer_g = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
     train_iter = tqdm(dataloader)
     for batch_i, (img, targets, paths, shapes) in enumerate(train_iter): 
         img = img.float()  # uint8 to fp16/32
@@ -545,14 +576,14 @@ def feature_trainer(dataloader,net,half,epoch):
             labels = torch.FloatTensor(gt_ft_map)
 
         # zero gradient
-        optimizer.zero_grad()
+        optimizer_g.zero_grad()
 
         # forward + backward + optimize
         outputs = net(img)
         assert(labels.size(1) == outputs.size(1))
         loss = criterion(outputs, labels)
         loss.backward()
-        optimizer.step()
+        optimizer_g.step()
         
         # print statistics
         running_loss += loss.cpu().item()
