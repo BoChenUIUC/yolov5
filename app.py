@@ -265,7 +265,7 @@ def deepcod_main():
     optimizer_d = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
     with open('training.log','a') as f:
-        f.write('-----------start---------')
+        f.write('-----------recloss + yololoss---------')
     for epoch in range(1,101):
         # train
         gen_model.train()
@@ -298,12 +298,12 @@ def deepcod_main():
                 pred = app_model(recon, augment=opt.augment)
                 fake_validity = discriminator(recon)
                 loss0, _ = compute_loss(pred[1], targets)
+                loss0 += criterion_mse(img,recon)
                 loss0 += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
-                loss_g = loss0 - torch.mean(fake_validity)
-                # feat_loss = 0
                 # for origin_feat,recon_feat in zip(origin_features,recon_features):
                 #     if origin_feat is None:continue
                 #     feat_loss += criterion_mse(origin_feat,recon_feat)
+                loss_g = loss0 - torch.mean(fake_validity)
 
             scaler_g.scale(loss_g).backward()
             scaler_g.step(optimizer_g)
@@ -432,7 +432,8 @@ def deepcod_main():
 
                 reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
                 yolo_loss, _ = compute_loss(pred[1], targets)
-                loss = reg_loss + yolo_loss
+                rec_loss = criterion_mse(img,recon)
+                loss = reg_loss + yolo_loss + rec_loss
                 
 
             # Run NMS
