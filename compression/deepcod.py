@@ -13,7 +13,7 @@ from torch.nn.utils import spectral_norm
 class Discriminator(nn.Module):
 	def __init__(self):
 		super(Discriminator, self).__init__()
-		no_of_hidden_units = 108
+		no_of_hidden_units = 64
 		self.conv1 = nn.Conv2d(3, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
 		# self.ln1 = nn.LayerNorm([no_of_hidden_units,32,32])
 		self.bn1 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
@@ -60,7 +60,7 @@ class Discriminator(nn.Module):
 		self.fc1 = nn.Linear(no_of_hidden_units, 1)
 
 	def forward(self, x, extract_features=0):
-		no_of_hidden_units = 108
+		no_of_hidden_units = 64
 		x = self.bn1(self.lrelu1(self.conv1(x)))
 		x = self.bn2(self.lrelu2(self.conv2(x)))
 		x = self.bn3(self.lrelu3(self.conv3(x)))
