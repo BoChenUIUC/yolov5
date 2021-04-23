@@ -297,8 +297,8 @@ def deepcod_main():
                 recon = gen_model(img)
                 pred = app_model(recon, augment=opt.augment)
                 fake_validity = discriminator(recon)
-                loss0, _ = compute_loss(pred[1], targets)
-                loss0 += criterion_mse(img,recon)
+                # loss0, _ = compute_loss(pred[1], targets)
+                loss0 = criterion_mse(img,recon)
                 loss0 += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
                 # for origin_feat,recon_feat in zip(origin_features,recon_features):
                 #     if origin_feat is None:continue
@@ -431,9 +431,9 @@ def deepcod_main():
                 pred = app_model(img, augment=opt.augment)
 
                 reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
-                yolo_loss, _ = compute_loss(pred[1], targets)
+                # yolo_loss, _ = compute_loss(pred[1], targets)
                 rec_loss = criterion_mse(img,recon)
-                loss = reg_loss + yolo_loss + rec_loss
+                loss = reg_loss + rec_loss
                 
 
             # Run NMS
