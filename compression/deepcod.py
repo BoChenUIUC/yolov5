@@ -10,10 +10,10 @@ from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
 
-no_of_hidden_units = 196
 class Discriminator(nn.Module):
 	def __init__(self):
 		super(Discriminator, self).__init__()
+		no_of_hidden_units = 196
 		self.conv1 = nn.Conv2d(3, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
 		# self.ln1 = nn.LayerNorm([no_of_hidden_units,32,32])
 		self.bn1 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
@@ -195,6 +195,7 @@ class DeepCOD(nn.Module):
 	def __init__(self, kernel_size=4, num_centers=8):
 		super(DeepCOD, self).__init__()
 		out_size = 3
+		no_of_hidden_units = 108
 		self.encoder = LightweightEncoder(out_size, kernel_size=4, num_centers=8)
 		self.conv1 = Middle_conv(out_size,out_size)
 		self.resblock_up1 = Resblock_up(out_size,no_of_hidden_units)
