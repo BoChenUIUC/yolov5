@@ -243,6 +243,7 @@ def deepcod_main():
     compute_loss = ComputeLoss(app_model)
 
     # encoder+decoder
+    PATH = 'backup/deepcod.pth'
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
     if half:
