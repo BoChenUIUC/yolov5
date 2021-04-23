@@ -430,7 +430,7 @@ def deepcod_main():
                 # output of generated input
                 pred = app_model(img, augment=opt.augment)
 
-                reg_loss = orthorgonal_regularizer(gen_model.sample.weight,0.0001,half)
+                reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
                 yolo_loss, _ = compute_loss(pred[1], targets)
                 loss = reg_loss + yolo_loss
                 
