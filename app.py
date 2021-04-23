@@ -401,7 +401,6 @@ def deepcod_main():
                 f"loss_g: {loss_g.cpu().item():.3f}. "
                 f"loss0: {loss0.cpu().item():.3f}. "
                 )
-            break
         train_iter.close()
 
         # eval
@@ -506,7 +505,6 @@ def deepcod_main():
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                 f"loss: {loss.cpu().item():.3f}. ")
-            break
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
         with open('training.log','a') as f:
