@@ -304,7 +304,7 @@ def deepcod_main():
                 #     if origin_feat is None:continue
                 #     feat_loss += criterion_mse(origin_feat,recon_feat)
 
-            scaler_g.scale(loss_d).backward()
+            scaler_g.scale(loss_g).backward()
             scaler_g.step(optimizer_g)
             scaler_g.update()
             for p in discriminator.parameters():
