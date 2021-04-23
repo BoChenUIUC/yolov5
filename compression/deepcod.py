@@ -60,6 +60,7 @@ class Discriminator(nn.Module):
 		self.fc1 = nn.Linear(no_of_hidden_units, 1)
 
 	def forward(self, x, extract_features=0):
+		no_of_hidden_units = 196
 		x = self.bn1(self.lrelu1(self.conv1(x)))
 		x = self.bn2(self.lrelu2(self.conv2(x)))
 		x = self.bn3(self.lrelu3(self.conv3(x)))
