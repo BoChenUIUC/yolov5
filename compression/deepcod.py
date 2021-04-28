@@ -9,94 +9,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
-
-class Discriminator(nn.Module):
-	def __init__(self):
-		super(Discriminator, self).__init__()
-		no_of_hidden_units = 64
-		self.conv1 = nn.Conv2d(3, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		# self.ln1 = nn.LayerNorm([no_of_hidden_units,32,32])
-		self.bn1 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu1 = nn.LeakyReLU()
-
-		self.conv2 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		# self.ln2 = nn.LayerNorm([no_of_hidden_units,16,16])
-		self.bn2 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu2 = nn.LeakyReLU()
-
-		self.conv3 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		# self.ln3 = nn.LayerNorm([no_of_hidden_units,16,16])
-		self.bn3 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu3 = nn.LeakyReLU()
-
-		self.conv4 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		# self.ln4 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.bn4 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu4 = nn.LeakyReLU()
-
-		self.conv5 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		# self.ln5 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.bn5 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu5 = nn.LeakyReLU()
-
-		self.conv6 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		# self.ln6 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.bn6 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu6 = nn.LeakyReLU()
-
-		self.conv7 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=1, padding=1)
-		# self.ln7 = nn.LayerNorm([no_of_hidden_units,8,8])
-		self.bn7 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu7 = nn.LeakyReLU()
-
-		self.conv8 = nn.Conv2d(no_of_hidden_units, no_of_hidden_units, kernel_size=3, stride=2, padding=1)
-		# self.ln8 = nn.LayerNorm([no_of_hidden_units,4,4])
-		self.bn8 = nn.BatchNorm2d(no_of_hidden_units, momentum=0.01, eps=1e-3)
-		self.lrelu8 = nn.LeakyReLU()
-
-		self.adaptive_pool = nn.AdaptiveAvgPool2d(4)
-
-		self.pool = nn.MaxPool2d(4, 4)
-		self.fc1 = nn.Linear(no_of_hidden_units, 1)
-
-	def forward(self, x, extract_features=0):
-		no_of_hidden_units = 64
-		x = self.bn1(self.lrelu1(self.conv1(x)))
-		x = self.bn2(self.lrelu2(self.conv2(x)))
-		x = self.bn3(self.lrelu3(self.conv3(x)))
-		x = self.bn4(self.lrelu4(self.conv4(x)))
-		x = self.bn5(self.lrelu5(self.conv5(x)))
-		x = self.bn6(self.lrelu6(self.conv6(x)))
-		x = self.bn7(self.lrelu7(self.conv7(x)))
-		x = self.bn8(self.lrelu8(self.conv8(x)))
-		x = self.adaptive_pool(x)
-		x = self.pool(x)
-		x = x.view(-1, no_of_hidden_units)
-		y1 = self.fc1(x)
-		return y1
-
-def compute_gradient_penalty(D, real_samples, fake_samples, cuda):
-	"""Calculates the gradient penalty loss for WGAN GP"""
-	# Random weight term for interpolation between real and fake samples
-	alpha = torch.Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
-	if cuda:alpha = alpha.cuda()
-	# Get random interpolation between real and fake samples
-	interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
-	d_interpolates = D(interpolates)
-	fake = Variable(torch.Tensor(real_samples.shape[0], 1).fill_(1.0), requires_grad=False)
-	if cuda: fake = fake.cuda()
-	# Get gradient w.r.t. interpolates
-	gradients = torch.autograd.grad(
-		outputs=d_interpolates,
-		inputs=interpolates,
-		grad_outputs=fake,
-		create_graph=True,
-		retain_graph=True,
-		only_inputs=True,
-	)[0]
-	gradients = gradients.view(gradients.size(0), -1)
-	gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-	return gradient_penalty
+from huffman import HuffmanCoding
 
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
@@ -156,18 +69,22 @@ class LightweightEncoder(nn.Module):
 	def forward(self, x):
 		# sample from input
 		x = self.sample(x)
+		B,C,H,W = x.size()
 
 		# quantization
 		xsize = list(x.size())
 		x = x.view(*(xsize + [1]))
 		quant_dist = torch.pow(x-self.centers, 2)
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
-		maxval = torch.min(quant_dist, dim=-1, keepdim=True)[0]
-		hardout = torch.sum(self.centers * (maxval == quant_dist), dim=-1)
+		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
+		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
 		# dont know how to use hardout, use this temporarily
 		x = softout
 
-		return x
+		huffman = HuffmanCoding()
+		real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+		real_cr = 1/16.*real_size/(H*W*C*B*8)
+		return x,real_cr
 
 class Output_conv(nn.Module):
 
@@ -206,7 +123,7 @@ class DeepCOD(nn.Module):
 		
 
 	def forward(self, x): 
-		x = self.encoder(x)
+		x,r = self.encoder(x)
 
 		# reconstruct
 		x = self.conv1(x)
@@ -215,7 +132,7 @@ class DeepCOD(nn.Module):
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
-		return x
+		return x,r
 
 if __name__ == '__main__':
 	image = torch.randn(1,3,32,32)

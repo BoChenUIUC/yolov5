@@ -221,7 +221,7 @@ class TwoLayer(nn.Module):
         return x
 
 def deepcod_main():
-    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights, Discriminator, compute_gradient_penalty
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
 
@@ -240,10 +240,9 @@ def deepcod_main():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
     app_model.eval()
-    compute_loss = ComputeLoss(app_model)
 
     # encoder+decoder
-    PATH = 'backup/deepcod.pth'
+    PATH = 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD()
     gen_model.apply(init_weights)
     if half:
@@ -252,24 +251,13 @@ def deepcod_main():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.float()
 
-    # discriminator
-    lambda_gp = 10
-    discriminator = Discriminator()
-    if half:
-        discriminator = discriminator.cuda()
-
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    scaler_d = torch.cuda.amp.GradScaler(enabled=half)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
-    optimizer_d = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
 
-    with open('training.log','a') as f:
-        f.write('-----------recloss + yololoss---------')
     for epoch in range(1,101):
         # train
         gen_model.train()
-        discriminator.train()
         if half:
             iouv = torch.linspace(0.5, 0.95, 10).cuda()
         else:
@@ -290,43 +278,21 @@ def deepcod_main():
             nb, _, height, width = img.shape  # batch size, channels, height, width
 
             # generator update
-            for p in discriminator.parameters():
-                p.requires_grad_(False)
             optimizer_g.zero_grad()
             with autocast():
-                recon = gen_model(img)
-                pred = app_model(recon, augment=opt.augment)
-                fake_validity = discriminator(recon)
-                # loss0, _ = compute_loss(pred[1], targets)
-                loss0 = criterion_mse(img,recon)
-                loss0 += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
-                # for origin_feat,recon_feat in zip(origin_features,recon_features):
-                #     if origin_feat is None:continue
-                #     feat_loss += criterion_mse(origin_feat,recon_feat)
-                loss_g = loss0 - torch.mean(fake_validity)
+                recon,r = gen_model(img)
+                pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
+                _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
+                loss_g = criterion_mse(img,recon)
+                loss_g += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                for origin_feat,recon_feat in zip(origin_features,recon_features):
+                    if origin_feat is None:continue
+                    loss_g += criterion_mse(origin_feat,recon_feat)
 
             scaler_g.scale(loss_g).backward()
             scaler_g.step(optimizer_g)
             scaler_g.update()
-            for p in discriminator.parameters():
-                p.requires_grad_(True)
 
-            # discriminator update
-            optimizer_d.zero_grad()
-            with autocast():
-                # real images
-                real_validity = discriminator(img)
-                # fake images
-                fake_imgs = gen_model(img)
-                fake_validity = discriminator(fake_imgs)
-                # Gradient penalty
-                gradient_penalty = compute_gradient_penalty(discriminator, img.data, fake_imgs.data, half)
-                # Adversarial loss
-                loss_d = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
-
-            scaler_d.scale(loss_d).backward()
-            scaler_d.step(optimizer_d)
-            scaler_d.update()
 
             # Run NMS
             if half:
@@ -397,9 +363,8 @@ def deepcod_main():
                 f"Train: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss_d: {loss_d.cpu().item():.3f}. "
                 f"loss_g: {loss_g.cpu().item():.3f}. "
-                f"loss0: {loss0.cpu().item():.3f}. "
+                f"r: {r:.3f}. "
                 )
         train_iter.close()
 
@@ -426,16 +391,15 @@ def deepcod_main():
 
             # Run model
             with torch.no_grad():
-                img = gen_model(img)
-                # output of generated input
-                pred = app_model(img, augment=opt.augment)
-
-                reg_loss = orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
-                # yolo_loss, _ = compute_loss(pred[1], targets)
-                rec_loss = criterion_mse(img,recon)
-                loss = reg_loss + rec_loss
+                recon,r = gen_model(img)
+                pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
+                _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
+                loss = criterion_mse(img,recon)
+                loss += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                for origin_feat,recon_feat in zip(origin_features,recon_features):
+                    if origin_feat is None:continue
+                    loss += criterion_mse(origin_feat,recon_feat)
                 
-
             # Run NMS
             if half:
                 targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
@@ -505,14 +469,10 @@ def deepcod_main():
                 f"Test: {epoch:3}. "
                 f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                 f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                f"loss: {loss.cpu().item():.3f}. ")
+                f"loss: {loss.cpu().item():.3f}. "
+                f"r: {r:.3f}. ")
         test_iter.close()
         torch.save(gen_model.state_dict(), PATH)
-        with open('training.log','a') as f:
-            f.write(f"Test: {epoch:3}. "
-                    f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
-                    f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                    f"loss: {loss.cpu().item():.3f}. \n")
 
 
 def feature_main():
