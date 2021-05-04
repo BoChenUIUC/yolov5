@@ -122,6 +122,8 @@ class Model(nn.Module):
 
     def forward_once(self, x, profile=False, extract_features=False):
         y, dt = [], []  # outputs
+        z = [x]
+        save = [2,4,6,9,13,17,20,23]
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -136,11 +138,12 @@ class Model(nn.Module):
 
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
+            z.append(x if m.i in save else None)
 
         if profile:
             print('%.1fms total' % sum(dt))
         if extract_features:
-            return x,y
+            return x,z
         return x
 
     def _initialize_biases(self, cf=None):  # initialize biases into Detect(), cf is class frequency

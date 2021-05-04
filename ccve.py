@@ -604,17 +604,35 @@ def cco_mobo(max_iter=10):
 	Optimizer.initialize(init_points=5)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 
-def cco_tmp():
+def cco_mobo(max_iter=20):
 	from app import evaluate_threshold
-	thresholds = [[0.1,0],[0.05,0],[0.15,0]]
-	cfg_file = open('MOBO_cfg.log', "w", 1)
-	acc_file = open('MOBO_acc.log', "w", 1)
-	cr_file = open('MOBO_cr.log', "w", 1)
-	for x in thresholds:
+	d = {}
+	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
+	d['acc_file'] = open('MOBO_acc.log', "w", 1)
+	d['cr_file'] = open('MOBO_cr.log', "w", 1)
+	def objective(x):
 		acc,cr = evaluate_threshold(x)
-		cfg_file.write(' '.join([str(n) for n in x])+'\n')
-		acc_file.write(str(acc)+'\n')
-		cr_file.write(str(cr)+'\n')
+		d['cfg_file'].write(' '.join([str(n) for n in x])+'\n')
+		d['acc_file'].write(str(acc)+'\n')
+		d['cr_file'].write(str(cr)+'\n')
+		return np.array([acc,cr])
+	Optimizer = mo.MOBayesianOpt(target=objective,
+		NObj=2,
+		pbounds=np.array([[0,0.1],[0,0.1]])) # decided by rough estimate
+	Optimizer.initialize(init_points=5)
+	front, pop = Optimizer.maximize(n_iter=max_iter)
+
+# def cco_tmp():
+# 	from app import evaluate_threshold
+# 	thresholds = [[0.1,0],[0.05,0],[0.15,0]]
+# 	cfg_file = open('MOBO_cfg.log', "w", 1)
+# 	acc_file = open('MOBO_acc.log', "w", 1)
+# 	cr_file = open('MOBO_cr.log', "w", 1)
+# 	for x in thresholds:
+# 		acc,cr = evaluate_threshold(x)
+# 		cfg_file.write(' '.join([str(n) for n in x])+'\n')
+# 		acc_file.write(str(acc)+'\n')
+# 		cr_file.write(str(cr)+'\n')
 
 def test():
 	from app import deepcod_main
@@ -629,7 +647,7 @@ if __name__ == "__main__":
 	# maybe no mobo in yolo since it takes too long
 	# just use 0.1,0.05,0.15,...
 	# or borrow result from MPL
-	# cco_tmp()
+	# cco_mobo()
 	test()
 
 	# samples for eval

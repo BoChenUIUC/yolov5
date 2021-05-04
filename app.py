@@ -514,7 +514,7 @@ def deepcod_main():
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=True
+    use_subsampling=False
     # data
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
@@ -530,7 +530,7 @@ def deepcod_main():
 
     # encoder+decoder
     PATH = 'backup/deepcod_soft_ss_c8.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
-    gen_model = DeepCOD(use_subsampling)
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if half:
         gen_model = gen_model.cuda()
