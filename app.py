@@ -542,7 +542,7 @@ def deepcod_main():
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     max_map = 0
-    for epoch in range(1,4):
+    for epoch in range(1,5):
         rlcr = AverageMeter()
         # train
         gen_model.train()
