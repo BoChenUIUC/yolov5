@@ -604,7 +604,7 @@ def cco_mobo(max_iter=10):
 	Optimizer.initialize(init_points=5)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 
-def cco_mobo(max_iter=20):
+def cco_mobo(max_iter=30):
 	from app import evaluate_threshold
 	d = {}
 	d['cfg_file'] = open('MOBO_cfg.log', "w", 1)
@@ -618,7 +618,7 @@ def cco_mobo(max_iter=20):
 		return np.array([acc,cr])
 	Optimizer = mo.MOBayesianOpt(target=objective,
 		NObj=2,
-		pbounds=np.array([[0,0.1],[0,0.1]])) # decided by rough estimate
+		pbounds=np.array([[0,0.15]])) # decided by rough estimate
 	Optimizer.initialize(init_points=5)
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 
