@@ -542,7 +542,7 @@ def deepcod_main():
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     max_map = 0
-    
+
     thresh = torch.FloatTensor([0.1])
     if half: thresh = thresh.cuda()
     for epoch in range(1,7):
@@ -586,7 +586,7 @@ def deepcod_main():
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     filter_loss,real_cr,entropy = res
-                    loss += 0.001*filter_loss + 0.0001* entropy
+                    loss += 0.01*filter_loss + 0.0001* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
