@@ -542,6 +542,9 @@ def deepcod_main():
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     max_map = 0
+    
+    thresh = torch.FloatTensor([0.1])
+    if half: thresh = thresh.cuda()
     for epoch in range(1,7):
         rlcr = AverageMeter()
         # train
@@ -561,8 +564,6 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         # assign threshold
         cnt = 0
-        thresh = torch.rand(1)
-        if half: thresh = thresh.cuda()
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -679,8 +680,6 @@ def deepcod_main():
         train_iter.close()
 
         # eval
-        thresh = torch.FloatTensor([0.1])
-        if half: thresh = thresh.cuda()
         rlcr = AverageMeter()
         gen_model.eval()
         if half:
