@@ -275,16 +275,16 @@ def evaluate_threshold(thresh):
                     recon,r = gen_model(img)
                 pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
                 _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
-                loss_g = criterion_mse(img,recon)
-                loss_g += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                loss = criterion_mse(img,recon)
+                loss += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
                     if origin_feat is None:continue
-                    loss_g += criterion_mse(origin_feat,recon_feat)
+                    loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     esti_cr,real_cr,std = res
-                    # loss_g += esti_cr - 0.0001*std
+                    # loss += esti_cr - 0.0001*std
 
-            scaler_g.scale(loss_g).backward()
+            scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
             scaler_g.update()
 
@@ -361,7 +361,7 @@ def evaluate_threshold(thresh):
                         f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -369,7 +369,7 @@ def evaluate_threshold(thresh):
                         f"Train: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
         train_iter.close()
@@ -486,7 +486,7 @@ def evaluate_threshold(thresh):
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -494,7 +494,7 @@ def evaluate_threshold(thresh):
                         f"Test: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
         test_iter.close()
@@ -515,8 +515,6 @@ def deepcod_main():
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
     use_subsampling=True
-    mode = 0 # 0:CCO-R, 1:CCO-A
-    thresh_list = [[0.1,0]] # for adaptive
     # data
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
@@ -531,9 +529,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/COO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
-    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
-    print(PATH)
+    PATH = 'backup/COO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if half:
@@ -565,24 +561,13 @@ def deepcod_main():
         train_iter = tqdm(train_loader)
         # assign threshold
         cnt = 0
-        if mode == 0:
-            thresh = torch.rand(1)
-        else:
-            thresh = torch.FloatTensor(thresh_list[cnt%len(thresh_list)])
+        thresh = torch.rand(1)
         if half: thresh = thresh.cuda()
         for batch_i, (img, targets, paths, shapes) in enumerate(train_iter):
             img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
             img /= 255.0  # 0 - 255 to 0.0 - 1.0
             if half:targets = targets.cuda()
             nb, _, height, width = img.shape  # batch size, channels, height, width
-
-            if batch_i%500 == 0:
-                cnt += 1
-                if mode == 0:
-                    thresh = torch.rand(1)
-                else:
-                    thresh = torch.FloatTensor(thresh_list[cnt%len(thresh_list)])
-                if half: thresh = thresh.cuda()
 
             # generator update
             optimizer_g.zero_grad()
@@ -593,16 +578,16 @@ def deepcod_main():
                     recon,r = gen_model(img)
                 pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
                 _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
-                loss_g = criterion_mse(img,recon)
-                loss_g += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                loss = criterion_mse(img,recon)
+                loss += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
                 for origin_feat,recon_feat in zip(origin_features,recon_features):
                     if origin_feat is None:continue
-                    loss_g += criterion_mse(origin_feat,recon_feat)
+                    loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
-                    esti_cr,real_cr,std = res
-                    # loss_g += esti_cr - 0.0001*std
+                    filter_loss,real_cr,entropy = res
+                    loss_g += 0.001*filter_loss + 0.0001* entropy
 
-            scaler_g.scale(loss_g).backward()
+            scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
             scaler_g.update()
 
@@ -680,7 +665,7 @@ def deepcod_main():
                         f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -688,7 +673,7 @@ def deepcod_main():
                         f"Train: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
                         )
         train_iter.close()
@@ -807,7 +792,7 @@ def deepcod_main():
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -815,16 +800,13 @@ def deepcod_main():
                         f"Test: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
                         )
         test_iter.close()
-        if mode == 0:
+        if metric[3] > max_map:
             torch.save(gen_model.state_dict(), PATH)
-        else:
-            if metric[3] > max_map:
-                torch.save(gen_model.state_dict(), PATH)
-                max_map = metric[3]
+            max_map = metric[3]
 
 # validate original, CCO-R, CCO-A
 def deepcod_validate():
@@ -834,8 +816,7 @@ def deepcod_validate():
     opt = sim.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=False
-    mode = 0 # 0:CCO-R, 1:CCO-A
+    use_subsampling=True
     # data
     test_loader = sim.dataloader
 
@@ -849,8 +830,7 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-R.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
-    if use_subsampling and mode==1:PATH = 'backup/CCO-A.pth'
+    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
     if args.device != 'cpu':
@@ -860,10 +840,7 @@ def deepcod_validate():
     thresh_list = []
     if use_subsampling:
         for th1 in range(11):
-            if mode == 0:
-                thresh = torch.FloatTensor([th1/10.0])
-            else:
-                thresh = torch.FloatTensor([th1/100.0])
+            thresh = torch.FloatTensor([th1/10.0])
             thresh_list.append(thresh)
     else:
         thresh_list.append(None)
@@ -976,7 +953,7 @@ def deepcod_validate():
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -984,12 +961,14 @@ def deepcod_validate():
                         f"Test: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss_g: {loss_g.cpu().item():.3f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
                         )
         with open("raw_eval.log" if use_subsampling else "original_eval.log", "a") as f:
             f.write(f"{metric[3]:.3f} {rlcr.avg:.5f}\n")
         test_iter.close()
+
+        #0.49,0.00489
 
 
 def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):

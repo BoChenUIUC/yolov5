@@ -170,7 +170,10 @@ class LightweightEncoder(nn.Module):
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1),0)
 			# affected data in the original shape
-			x = torch.where(cond_1, ss_1, x)
+			if not self.training:
+				x = torch.where(cond_1, ss_1, x)
+			else:
+				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 
 		# quantization
 		xsize = list(x.size())
@@ -189,15 +192,12 @@ class LightweightEncoder(nn.Module):
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
 			real_size += rle_len1
-			esti_size = torch.count_nonzero(cond_0) + torch.count_nonzero(cond_1)/4
-			esti_cr = 1/16.*esti_size/(H*W*C*B)
+			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			index = index.view(-1).unsqueeze(-1)
-			index_nums = torch.arange(0, 8).cuda()
-			counts = torch.sum(index==index_nums,dim=0)
-			counts = counts/torch.sum(counts)
-			std = torch.std(counts)
-			return x,(esti_cr,real_cr,std)
+			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
+			soft_prob = torch.mean(softmax_dist,dim=0)
+			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
+			return x,(filter_loss,real_cr,entropy)
 		else:
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
