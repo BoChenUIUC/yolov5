@@ -529,7 +529,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/COO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if half:
@@ -586,7 +586,7 @@ def deepcod_main():
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     filter_loss,real_cr,entropy = res
-                    loss += 0.01*filter_loss + 0.0001* entropy
+                    loss += 0.01*filter_loss# + 0.0001* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
