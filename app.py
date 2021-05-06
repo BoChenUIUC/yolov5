@@ -205,7 +205,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-def evaluate_threshold(thresh):
+def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
@@ -241,9 +241,9 @@ def evaluate_threshold(thresh):
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
     max_map = 0
     max_cr = 0
-    thresh = torch.FloatTensor(thresh)
+    thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
-    for epoch in range(1,5):
+    for epoch in range(1,6):
         # train
         gen_model.train()
         if half:
@@ -281,8 +281,8 @@ def evaluate_threshold(thresh):
                     if origin_feat is None:continue
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
-                    esti_cr,real_cr,std = res
-                    # loss += esti_cr - 0.0001*std
+                    filter_loss,real_cr,entropy = res
+                    loss += gamma1*filter_loss + gamma2* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
@@ -404,14 +404,8 @@ def evaluate_threshold(thresh):
                     recon,r = gen_model(img)
                 pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
                 _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
-                loss = criterion_mse(img,recon)
-                loss += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
-                for origin_feat,recon_feat in zip(origin_features,recon_features):
-                    if origin_feat is None:continue
-                    loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
-                    esti_cr,real_cr,std = res
-                    loss += esti_cr - 0.01*std
+                    _,real_cr,_ = res
 
             rlcr.update(real_cr if use_subsampling else r)
                 
@@ -486,7 +480,6 @@ def evaluate_threshold(thresh):
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -494,7 +487,6 @@ def evaluate_threshold(thresh):
                         f"Test: {epoch:3}. "
                         f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
         test_iter.close()
@@ -503,9 +495,6 @@ def evaluate_threshold(thresh):
             max_cr = rlcr.avg
     return float(max_map),max_cr
 
-# 1. get an average estimate
-# 2.1 finetune CCO-S:use one selected cfg per model
-# 2.2 finetune CCO-A:use a set of selected cfgs
 def deepcod_main():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
