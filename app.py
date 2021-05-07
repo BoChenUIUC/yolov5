@@ -241,9 +241,9 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001)
     max_map = 0
     max_cr = 0
-    thresh = torch.FloatTensor([0.5])
+    thresh = torch.FloatTensor([0.1])
     if half: thresh = thresh.cuda()
-    for epoch in range(1,6):
+    for epoch in range(1,7):
         # train
         gen_model.train()
         if half:
@@ -359,7 +359,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 if use_subsampling:
                     train_iter.set_description(
                         f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
@@ -367,7 +367,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 else:
                     train_iter.set_description(
                         f"Train: {epoch:3}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
@@ -478,14 +478,14 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 if use_subsampling:
                     test_iter.set_description(
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
                     test_iter.set_description(
                         f"Test: {epoch:3}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
