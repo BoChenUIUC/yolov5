@@ -503,7 +503,7 @@ def deepcod_main():
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=False
+    use_subsampling=True
     # data
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
@@ -575,7 +575,7 @@ def deepcod_main():
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     filter_loss,real_cr,entropy = res
-                    loss += 0.01*filter_loss + 0.0001* entropy
+                    # loss += 0.01*filter_loss + 0.0001* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
