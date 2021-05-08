@@ -534,7 +534,7 @@ def deepcod_main():
 
     thresh = torch.FloatTensor([0.1])
     if half: thresh = thresh.cuda()
-    for epoch in range(1,7):
+    for epoch in range(1,21):
         rlcr = AverageMeter()
         # train
         gen_model.train()
