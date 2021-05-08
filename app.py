@@ -532,7 +532,7 @@ def deepcod_main():
     optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     max_map = 0
 
-    thresh = torch.FloatTensor([0.1])
+    thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
     for epoch in range(1,21):
         rlcr = AverageMeter()
