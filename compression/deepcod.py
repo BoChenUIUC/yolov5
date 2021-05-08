@@ -137,7 +137,8 @@ class LightweightEncoder(nn.Module):
 		self.sample = nn.Conv2d(3, channels, kernel_size=kernel_size, stride=kernel_size, padding=0, bias=True)
 		self.sample = spectral_norm(self.sample)
 		self.centers = torch.nn.Parameter(torch.rand(num_centers))
-		self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		# self.pool1 = nn.Conv2d(3, 3, kernel_size=2, stride=2, padding=0)
+		self.pool1 = nn.MaxPool2d((2, 2), stride=(2, 2))
 		self.unpool = nn.Upsample(scale_factor=2, mode='nearest')
 
 		if use_subsampling:
@@ -170,11 +171,10 @@ class LightweightEncoder(nn.Module):
 			data_0 = x[cond_0]
 			comp_data = torch.cat((data_0,data_1),0)
 			# affected data in the original shape
-			x = torch.where(cond_1, ss_1, x)
-			# if not self.training:
-			# 	x = torch.where(cond_1, ss_1, x)
-			# else:
-			# 	x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
+			if not self.training:
+				x = torch.where(cond_1, ss_1, x)
+			else:
+				x = torch.mul(x,feat_1_) + torch.mul(ss_1,1-feat_1_)
 
 		# quantization
 		xsize = list(x.size())
