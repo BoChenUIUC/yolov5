@@ -605,22 +605,22 @@ def cco_mobo(max_iter=10):
 	front, pop = Optimizer.maximize(n_iter=max_iter)
 
 def test():
-	from app import deepcod_main
-	# deepcod_main()
+	from app import deepcod_main,deepcod_validate
+	deepcod_main()
 	# deepcod_validate()
-	from app import evaluate_config
-	# cfgs = [[0.0001,0.0001],[0.001,0.0001],[0.01,0.0001],[0.1,0.0001],[1,0.0001],\
-	# 		[0.01,0.001],[0.01,0.01],[0.01,0.1],[0.01,1]]
-	cfgs = [[0,0],[0.001,0.0001],[0.01,0.0001],[0.1,0.0001],[1,0.0001],\
-			[0.01,0.001],[0.01,0.01],[0.01,0.1],[0.01,1]]
-	cfg_file = open('cfg.log', "w", 1)
-	acc_file = open('acc.log', "w", 1)
-	cr_file = open('cr.log', "w", 1)
-	for cfg in cfgs:
-		acc,cr = evaluate_config(*cfg)
-		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
-		acc_file.write(str(acc)+'\n')
-		cr_file.write(str(cr)+'\n')
+	# from app import evaluate_config
+	# # cfgs = [[0.0001,0.0001],[0.001,0.0001],[0.01,0.0001],[0.1,0.0001],[1,0.0001],\
+	# # 		[0.01,0.001],[0.01,0.01],[0.01,0.1],[0.01,1]]
+	# cfgs = [[0,0],[0.001,0.0001],[0.01,0.0001],[0.1,0.0001],[1,0.0001],\
+	# 		[0.01,0.001],[0.01,0.01],[0.01,0.1],[0.01,1]] # [0.01,0]
+	# cfg_file = open('cfg.log', "w", 1)
+	# acc_file = open('acc.log', "w", 1)
+	# cr_file = open('cr.log', "w", 1)
+	# for cfg in cfgs:
+	# 	acc,cr = evaluate_config(*cfg)
+	# 	cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
+	# 	acc_file.write(str(acc)+'\n')
+	# 	cr_file.write(str(cr)+'\n')
 
 if __name__ == "__main__":
 	np.random.seed(123)

@@ -503,7 +503,7 @@ def deepcod_main():
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=True
+    use_subsampling=False
     # data
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader
@@ -575,7 +575,7 @@ def deepcod_main():
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     filter_loss,real_cr,entropy = res
-                    loss += 0.01*filter_loss# + 0.0001* entropy
+                    loss += 0.01*filter_loss + 0.0001* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
@@ -653,7 +653,7 @@ def deepcod_main():
                 if use_subsampling:
                     train_iter.set_description(
                         f"Train: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
@@ -661,7 +661,7 @@ def deepcod_main():
                 else:
                     train_iter.set_description(
                         f"Train: {epoch:3}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
@@ -804,7 +804,7 @@ def deepcod_validate():
     opt = sim.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=True
+    use_subsampling=False
     # data
     test_loader = sim.dataloader
 
@@ -939,7 +939,7 @@ def deepcod_validate():
                 if use_subsampling:
                     test_iter.set_description(
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
@@ -947,7 +947,7 @@ def deepcod_validate():
                 else:
                     test_iter.set_description(
                         f"Test: {epoch:3}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
