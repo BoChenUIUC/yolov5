@@ -629,7 +629,6 @@ def WebP(npimg,C_param):
 	return lossy_image,osize,csize,end-start
 
 def tile_scaler(image, C_param):
-	start = time.perf_counter() 
 	# analyze features in image
 	bgr_frame = np.array(image) 
 	img_h,img_w = bgr_frame.shape[:2]
@@ -643,9 +642,10 @@ def tile_scaler(image, C_param):
 	
 	huffman = HuffmanCoding()
 	compressed_size = len(huffman.compress(compressed.reshape(-1)))
-	end = time.perf_counter()
+	start = time.perf_counter() 
 	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 
+	end = time.perf_counter()
 	return decompressed,original_size,compressed_size,end-start
 
 
