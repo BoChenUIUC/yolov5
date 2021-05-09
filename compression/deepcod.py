@@ -123,17 +123,11 @@ class ContextExtractor(nn.Module):
 		super(ContextExtractor, self).__init__()
 		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv1 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv2 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn2 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
-		# self.conv3 = nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1)
-		# self.bn3 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
+		# try to be conservative
+		nn.init.constant_(self.conv1.bias, 1)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
-		# x = self.conv2(F.relu(self.bn2(x)))
-		# x = self.conv3(F.relu(self.bn3(x)))
 		x = (torch.tanh(x)+1)/2
 		return x
 
@@ -250,17 +244,19 @@ class Output_conv(nn.Module):
 def init_weights(m):
 	if isinstance(m, nn.Conv2d):
 		nn.init.kaiming_normal_(m.weight, mode='fan_out')
-		nn.init.constant_(m.bias, 0)
+		# nn.init.constant_(m.bias, 0)
 
 if __name__ == '__main__':
+	torch.manual_seed(1)
 	image = torch.randn(1,3,32,32)
 	model = DeepCOD()
-	output = model(image)
+	output = model((image,0.5))
 	print(model)
+	print(model.encoder.ctx.conv1.bias)
 	# print(output.shape)
 	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
 	# print(weight.size())
-	print(model.encoder.sample.weight.size())
+	# print(model.encoder.sample.weight.size())
 	# r = orthorgonal_regularizer(model.sample.weight,1,False)
 	# print(r)
 	# for name, param in model.named_parameters():
