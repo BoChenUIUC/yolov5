@@ -461,10 +461,11 @@ def speed_test(EXP_NAME):
 		elif EXP_NAME == 'Scale':
 			rate_ranges = [0.1*x for x in range(1,11)]
 		for r in rate_ranges:
-			print(EXP_NAME,r)
 			acc,cr = sim.get_one_point(datarange, TF=TF, C_param=r)
+			
+			print(EXP_NAME,r,TF.get_compression_time())
 	m,s = TF.get_compression_time()
-	eval_file.write(f"{m:.3f} {s:.3f}\n")
+	eval_file.write(f"{m:.5f} {s:.5f}\n")
 
 # determine sample size
 def test_run():
