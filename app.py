@@ -230,11 +230,11 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     # encoder+decoder
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
-    # if half:
-    #     gen_model = gen_model.cuda()
-    #     for layer in gen_model.modules():
-    #         if isinstance(layer, nn.BatchNorm2d):
-    #             layer.float()
+    if half:
+        gen_model = gen_model.cuda()
+        for layer in gen_model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
