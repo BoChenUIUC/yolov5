@@ -640,14 +640,13 @@ def tile_scaler(image, C_param):
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
 	# compressed_size = len(pickle.dumps(compressed, 0))
 	
+	start = time.perf_counter() 
 	huffman = HuffmanCoding()
 	compressed_size = len(huffman.compress(compressed.reshape(-1)))
-	start = time.perf_counter() 
 	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 
 	end = time.perf_counter()
 	return decompressed,original_size,compressed_size,end-start
-
 
 class TwoLayer(nn.Module):
 	def __init__(self):
