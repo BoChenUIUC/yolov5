@@ -588,32 +588,32 @@ def dual_train(net):
 
 def test():
 	from app import deepcod_main,deepcod_validate
-	deepcod_main()
+	# deepcod_main()
 	# deepcod_validate()
-	# from app import evaluate_config
-	# cfgs = [[0,0]]
-	# cfg_file = open('cfg.log', "w", 1)
-	# acc_file = open('acc.log', "w", 1)
-	# cr_file = open('cr.log', "w", 1)
-	# for cfg in cfgs:
-	# 	acc,cr = evaluate_config(*cfg)
-	# 	cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
-	# 	acc_file.write(str(acc)+'\n')
-	# 	cr_file.write(str(cr)+'\n')
+	from app import evaluate_config
+	cfgs = [[0,0]]
+	cfg_file = open('cfg.log', "w", 1)
+	acc_file = open('acc.log', "w", 1)
+	cr_file = open('cr.log', "w", 1)
+	for cfg in cfgs:
+		acc,cr = evaluate_config(*cfg)
+		cfg_file.write(' '.join([str(n) for n in cfg])+'\n')
+		acc_file.write(str(acc)+'\n')
+		cr_file.write(str(cr)+'\n')
 
 if __name__ == "__main__":
 	np.random.seed(123)
 	torch.manual_seed(2)
 
 	# test 
-	test()
+	# test()
 
 	# samples for eval
 	# generate_image_samples('Tiled')
 
 	# speed test
-	# for name in ['TiledLegacy']:
-	# 	speed_test(name)
+	for name in ['JPEG','WebP','Scale']:
+		speed_test(name)
 
 	# 1. determine lenght of episode
 	# test_run()
