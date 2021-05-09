@@ -612,7 +612,7 @@ if __name__ == "__main__":
 	# generate_image_samples('Tiled')
 
 	# speed test
-	for name in ['JPEG','WebP','Scale']:
+	for name in ['JPEG2000']:
 		speed_test(name)
 
 	# 1. determine lenght of episode
