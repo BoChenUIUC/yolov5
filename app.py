@@ -518,7 +518,7 @@ def deepcod_main():
     opt = sim_train.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=True
+    use_subsampling=opt.use_subsampling
     # data
     test_loader = sim_test.dataloader
     train_loader = sim_train.dataloader

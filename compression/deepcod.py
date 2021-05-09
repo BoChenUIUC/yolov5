@@ -43,11 +43,13 @@ class DeepCOD(nn.Module):
 		x,r = self.encoder(x)
 
 		# reconstruct
+		start = time.perf_counter()
 		x = self.conv1(x)
 		x = self.resblock_up1(x)
 		x = self.conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
+		print(time.perf_counter()-start)
 		
 		return x,r
 def orthorgonal_regularizer(w,scale,cuda=False):
