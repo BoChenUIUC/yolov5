@@ -124,7 +124,7 @@ class ContextExtractor(nn.Module):
 		self.conv1 = nn.Conv2d(3, 3, kernel_size=8, stride=8, padding=0)
 		self.bn1 = nn.BatchNorm2d(3, momentum=0.01, eps=1e-3)
 		# try to be conservative
-		nn.init.constant_(self.conv1.bias, 5)
+		nn.init.constant_(self.conv1.bias, 2)
 
 	def forward(self, x):
 		x = self.conv1(F.relu(self.bn1(x)))
