@@ -411,8 +411,14 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                     recon,r = gen_model(img)
                 pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
                 _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
+                loss = criterion_mse(img,recon)
+                loss += orthorgonal_regularizer(gen_model.encoder.sample.weight,0.0001,half)
+                for origin_feat,recon_feat in zip(origin_features,recon_features):
+                    if origin_feat is None:continue
+                    loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
-                    _,real_cr,_ = res
+                    filter_loss,real_cr,entropy = res
+                    loss += gamma1*filter_loss + gamma2* entropy
 
             rlcr.update(real_cr if use_subsampling else r)
                 
@@ -487,6 +493,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
                         f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
                 else:
@@ -494,6 +501,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                         f"Test: {epoch:3}. "
                         f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                        f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
                         )
         test_iter.close()
