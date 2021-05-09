@@ -591,7 +591,6 @@ def JPEG2000(npimg,C_param):
 
 def TUBBOJPEG(npimg,C_param,jpeg):
 	bgr_frame = np.ascontiguousarray(npimg)
-	start = time.perf_counter()
 	# divide image to 4*3 tiles
 	img_h,img_w = bgr_frame.shape[:2]
 	block_w,block_h = 16,8
@@ -604,8 +603,9 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	feature_encoding = np.zeros(widthInBlock*heightInBlock,dtype=np.uint8)*q
 	jpegraw = jpeg.encode(bgr_frame,feature_encoding,q)
 	csize = len(jpegraw)
-	end = time.perf_counter()
+	start = time.perf_counter()
 	lossy_image = jpeg.decode(jpegraw,feature_encoding)
+	end = time.perf_counter()
 	return lossy_image,osize,csize,end-start
 
 def JPEG(npimg,C_param):
@@ -621,11 +621,11 @@ def JPEG(npimg,C_param):
 def WebP(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
-	start = time.perf_counter()
 	result, lossy_image = cv2.imencode('.webp', npimg, encode_param)
-	end = time.perf_counter()
 	csize = len(pickle.dumps(lossy_image, 0))
+	start = time.perf_counter()
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	end = time.perf_counter()
 	return lossy_image,osize,csize,end-start
 
 def tile_scaler(image, C_param):
