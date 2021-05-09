@@ -609,11 +609,11 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	return lossy_image,osize,csize,end-start
 
 def JPEG(npimg,C_param):
-	start = time.perf_counter()
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
 	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
 	csize = len(pickle.dumps(lossy_image, 0))
+	start = time.perf_counter()
 	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 	end = time.perf_counter()
 	return lossy_image,osize,csize,end-start
