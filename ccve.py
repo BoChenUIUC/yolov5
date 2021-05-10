@@ -607,14 +607,14 @@ if __name__ == "__main__":
 	torch.manual_seed(2)
 
 	# test 
-	# test()
+	test()
 
 	# samples for eval
 	# generate_image_samples('Tiled')
 
 	# speed test
-	for name in ['Scale']:
-		speed_test(name)
+	# for name in ['Scale']:
+	# 	speed_test(name)
 
 	# 1. determine lenght of episode
 	# test_run()
