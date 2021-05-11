@@ -355,7 +355,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 # Append statistics (correct, conf, pcls, tcls)
                 stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
 
-            if batch_i%5000==0 or batch_i==(len(train_loader)-1):
+            if batch_i==(len(train_loader)-1):
                 metric = stat_to_map(stats,names,nc)
                 if use_subsampling:
                     train_iter.set_description(
@@ -486,7 +486,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
                 # Append statistics (correct, conf, pcls, tcls)
                 stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
 
-            if batch_i%100==0 or batch_i==(len(test_loader)-1):
+            if batch_i==(len(test_loader)-1):
                 metric = stat_to_map(stats,names,nc)
                 if use_subsampling:
                     test_iter.set_description(
