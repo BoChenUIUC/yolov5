@@ -238,10 +238,10 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0005, betas=(0,0.9))
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.001, betas=(0,0.9))
     max_map = 0
     max_cr = 0
-    thresh = torch.FloatTensor([0.1])
+    thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
     print(gamma1,gamma2,thresh)
     for epoch in range(1,51):
