@@ -244,7 +244,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
     thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
     print(gamma1,gamma2,thresh)
-    for epoch in range(1,7):
+    for epoch in range(1,8):
         # train
         gen_model.train()
         if half:
@@ -533,7 +533,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if half:
@@ -549,7 +549,7 @@ def deepcod_main():
 
     thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
-    for epoch in range(1,7):
+    for epoch in range(1,8):
         rlcr = AverageMeter()
         # train
         gen_model.train()
@@ -590,7 +590,7 @@ def deepcod_main():
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
                     filter_loss,real_cr,entropy = res
-                    # loss += 0.01*filter_loss + 0.0001* entropy
+                    loss += 0.01*filter_loss + 0.0001* entropy
 
             scaler_g.scale(loss).backward()
             scaler_g.step(optimizer_g)
@@ -719,7 +719,9 @@ def deepcod_main():
                     if origin_feat is None:continue
                     loss += criterion_mse(origin_feat,recon_feat)
                 if use_subsampling:
-                    esti_cr,real_cr,std = res
+                    filter_loss,real_cr,entropy = res
+                    loss += 0.01*filter_loss + 0.0001* entropy
+                    # esti_cr,real_cr,std = res
                     # loss += esti_cr - 0.01*std
 
             rlcr.update(real_cr if use_subsampling else r)
