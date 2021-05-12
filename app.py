@@ -238,7 +238,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001):
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.01, betas=(0,0.9))
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.1)
     max_map = 0
     max_cr = 0
     thresh = torch.FloatTensor([0.5])
