@@ -244,7 +244,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
     thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
     print(gamma1,gamma2,thresh,lr)
-    for epoch in range(1,8):
+    for epoch in range(1,11):
         # train
         gen_model.train()
         if half:
