@@ -205,7 +205,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
+def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.05):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
@@ -244,7 +244,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
     thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
     print(gamma1,gamma2,thresh,lr)
-    for epoch in range(1,11):
+    for epoch in range(1,8):
         # train
         gen_model.train()
         if half:
