@@ -544,7 +544,7 @@ def deepcod_main():
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.001, betas=(0,0.9))
     max_map = 0
 
     thresh = torch.FloatTensor([0.5])
@@ -795,7 +795,7 @@ def deepcod_main():
                 if use_subsampling:
                     test_iter.set_description(
                         f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"cr: {rlcr.avg:.5f}. "
@@ -803,7 +803,7 @@ def deepcod_main():
                 else:
                     test_iter.set_description(
                         f"Test: {epoch:3}. "
-                        f"map50: {metric[3]:.2f}. map: {metric[4]:.2f}. "
+                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
                         f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
                         f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
