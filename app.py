@@ -542,6 +542,8 @@ def deepcod_main():
     PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8_0005.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
+    if not use_subsampling:
+        gen_model.load_state_dict(torch.load('backup/deepcod_soft_c8',map_location='cpu'))
     if half:
         gen_model = gen_model.cuda()
         for layer in gen_model.modules():
