@@ -689,6 +689,12 @@ def deepcod_main():
                         f"loss: {loss.cpu().item():.3f}. "
                         f"r: {rlcr.avg:.5f}. "
                         )
+            else:
+                train_iter.set_description(
+                    f"Train: {epoch:3}. "
+                    f"loss: {loss.cpu().item():.3f}. "
+                    f"cr: {rlcr.avg:.5f}. "
+                    )
         train_iter.close()
 
         # eval
