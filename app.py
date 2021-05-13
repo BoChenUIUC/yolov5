@@ -205,7 +205,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.05):
+def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.001):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
@@ -228,8 +228,13 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.05):
     app_model.eval()
 
     # encoder+decoder
+    PATH = 'backup/CCO-pre.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
+    try:
+        gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
+    except e:
+        print(PATH,"not found")
     if half:
         gen_model = gen_model.cuda()
         for layer in gen_model.modules():
@@ -238,12 +243,12 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.05):
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=lr)
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=lr, betas=(0,0.9))
     max_map = 0
     max_cr = 0
     thresh = torch.FloatTensor([0.5])
     if half: thresh = thresh.cuda()
-    print(gamma1,gamma2,thresh,lr)
+    print(PATH,gamma1,gamma2,thresh,lr)
     for epoch in range(1,8):
         # train
         gen_model.train()
@@ -508,6 +513,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.05):
         if metric[3] > max_map:
             max_map = metric[3]
             max_cr = rlcr.avg
+            torch.save(gen_model.state_dict(), PATH)
     return float(max_map),max_cr
 
 def deepcod_main():
