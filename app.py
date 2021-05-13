@@ -539,7 +539,7 @@ def deepcod_main():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO.pth' if use_subsampling else 'backup/deepcod_soft_c8_0001.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     if half:
@@ -550,7 +550,7 @@ def deepcod_main():
 
     criterion_mse = nn.MSELoss()
     scaler_g = torch.cuda.amp.GradScaler(enabled=half)
-    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.001, betas=(0,0.9))
+    optimizer_g = torch.optim.Adam(gen_model.parameters(), lr=0.0001, betas=(0,0.9))
     max_map = 0
 
     thresh = torch.FloatTensor([0.5])
