@@ -228,7 +228,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-pre2.pth'
+    PATH = 'backup/CCO-pre.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     try:
