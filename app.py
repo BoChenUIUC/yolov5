@@ -233,7 +233,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.001):
     gen_model.apply(init_weights)
     try:
         gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
-    except e:
+    except:
         print(PATH,"not found")
     if half:
         gen_model = gen_model.cuda()
