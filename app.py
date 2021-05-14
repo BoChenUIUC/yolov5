@@ -205,7 +205,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
+def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.001):
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim_train = Simulator(train=True,use_model=True)
     sim_test = Simulator(train=False,use_model=False)
@@ -228,7 +228,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-pre.pth'
+    PATH = 'backup/CCO-pre2.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.apply(init_weights)
     try:
@@ -513,7 +513,7 @@ def evaluate_config(gamma1=0.0001,gamma2=0.0001,lr=0.01):
         if metric[3] > max_map:
             max_map = metric[3]
             max_cr = rlcr.avg
-            torch.save(gen_model.state_dict(), PATH)
+            # torch.save(gen_model.state_dict(), PATH)
     return float(max_map),max_cr
 
 def deepcod_main():
