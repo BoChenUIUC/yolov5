@@ -592,7 +592,7 @@ def test():
 	# deepcod_main()
 	# deepcod_validate()
 	from app import evaluate_config
-	cfgs = [[0.01, 0.001]]
+	cfgs = [[0.01, 0.01]]
 	# cfgs = [[0,0]]
 	# cfgs = [[0.0001,0]]
 	cfg_file = open('cfg.log', "w", 1)
