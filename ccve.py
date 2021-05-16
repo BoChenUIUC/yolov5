@@ -626,7 +626,8 @@ if __name__ == "__main__":
 	torch.manual_seed(2)
 
 	# test 
-	test()
+	# test()
+	cco_mobo()
 
 	# samples for eval
 	# generate_image_samples('Tiled')
