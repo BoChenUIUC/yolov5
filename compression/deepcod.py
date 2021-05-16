@@ -159,6 +159,9 @@ class LightweightEncoder(nn.Module):
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
+			# feature 
+			feat_1 = self.ctx(x)
+			feat_1_ = self.unpool(feat_1)
 		x = self.sample(x)
 
 		# subsampling
@@ -166,9 +169,6 @@ class LightweightEncoder(nn.Module):
 		B,C,H,W = x.size()
 		assert(H%2==0 and W%2==0)
 		if self.use_subsampling:
-			# feature 
-			feat_1 = self.ctx(x)
-			feat_1_ = self.unpool(feat_1)
 			th_1 = thresh
 			# sub-sample
 			ss_1 = self.unpool(self.pool1(x))
