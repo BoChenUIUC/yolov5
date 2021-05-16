@@ -588,7 +588,7 @@ def dual_train(net):
 		torch.save(net.state_dict(), PATH)
 
 def cco_mobo(max_iter=25):
-	from app import evaluate_threshold
+	from app import evaluate_config
 	d = {}
 	d['cfg_file'] = open('cfg.log', "w", 1)
 	d['acc_file'] = open('acc.log', "w", 1)
