@@ -611,21 +611,21 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 def JPEG(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
-	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
-	csize = len(pickle.dumps(lossy_image, 0))
 	start = time.perf_counter()
-	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	result, lossy_image = cv2.imencode('.jpg', npimg, encode_param)
 	end = time.perf_counter()
+	csize = len(pickle.dumps(lossy_image, 0))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 	return lossy_image,osize,csize,end-start
 
 def WebP(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
-	result, lossy_image = cv2.imencode('.webp', npimg, encode_param)
-	csize = len(pickle.dumps(lossy_image, 0))
 	start = time.perf_counter()
-	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
+	result, lossy_image = cv2.imencode('.webp', npimg, encode_param)
 	end = time.perf_counter()
+	csize = len(pickle.dumps(lossy_image, 0))
+	lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 	return lossy_image,osize,csize,end-start
 
 def tile_scaler(image, C_param):
@@ -637,16 +637,16 @@ def tile_scaler(image, C_param):
 	# ploting the pareto front
 	dsize = (int(img_w*C_param),int(C_param*img_h))
 	original_size = len(pickle.dumps(bgr_frame, 0))
+	start = time.perf_counter() 
 	compressed = cv2.resize(bgr_frame, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+	end = time.perf_counter()
 	# compressed_size = len(pickle.dumps(compressed, 0))
 	
 	huffman = HuffmanCoding()
 	compressed_size = len(huffman.compress(compressed.reshape(-1)))
 	
-	start = time.perf_counter() 
 	decompressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 
-	end = time.perf_counter()
 	return decompressed,original_size,compressed_size,end-start
 
 class TwoLayer(nn.Module):

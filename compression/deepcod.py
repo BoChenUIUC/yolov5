@@ -38,7 +38,6 @@ class DeepCOD(nn.Module):
 		self.resblock_up2 = Resblock_up(no_of_hidden_units,no_of_hidden_units)
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
-
 	def forward(self, x):
 		x,r,t = self.encoder(x)
 
@@ -48,7 +47,6 @@ class DeepCOD(nn.Module):
 		x = self.conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
-		print(time.perf_counter()-t)
 		
 		return x,r
 def orthorgonal_regularizer(w,scale,cuda=False):
@@ -157,6 +155,7 @@ class LightweightEncoder(nn.Module):
 		self.use_subsampling = use_subsampling
 
 	def forward(self, x):
+		start = time.perf_counter()
 		# sample from input
 		if self.use_subsampling:
 			x,thresh = x
@@ -204,19 +203,19 @@ class LightweightEncoder(nn.Module):
 			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
-			start = time.perf_counter()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
+			dur = time.perf_counter() - start
 			real_size += rle_len1
 			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			return x,(filter_loss,real_cr,entropy),start
+			return x,(filter_loss,real_cr,entropy),dur
 		else:
 			huffman = HuffmanCoding()
-			start = time.perf_counter()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
+			dur = time.perf_counter() - start
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			return x,real_cr,start
+			return x,real_cr,dur
 
 def mask_compression(mask):
 	prev = 1

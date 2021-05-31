@@ -827,6 +827,7 @@ def deepcod_main():
             torch.save(gen_model.state_dict(), PATH)
             max_map = metric[3]
 
+
 def deepcod_validate():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim = Simulator(train=False,use_model=True)
