@@ -827,7 +827,6 @@ def deepcod_main():
             torch.save(gen_model.state_dict(), PATH)
             max_map = metric[3]
 
-# validate original, CCO-R, CCO-A
 def deepcod_validate():
     from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
     sim = Simulator(train=False,use_model=True)
@@ -835,7 +834,7 @@ def deepcod_validate():
     opt = sim.opt
     device = select_device(opt.device, batch_size=opt.batch_size)
     half = opt.device != 'cpu'
-    use_subsampling=False
+    use_subsampling=opt.use_subsampling
     # data
     test_loader = sim.dataloader
 
@@ -849,146 +848,194 @@ def deepcod_validate():
     app_model.eval()
 
     # encoder+decoder
-    PATH = 'backup/CCO-A.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    PATH = 'backup/CCO-pre2.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
     gen_model = DeepCOD(use_subsampling=use_subsampling)
     gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
-    if args.device != 'cpu':
+    if opt.device != 'cpu':
         gen_model = gen_model.cuda()
 
     # thresh to evaluate
-    thresh_list = []
-    if use_subsampling:
-        for th1 in range(11):
-            thresh = torch.FloatTensor([th1/10.0])
-            thresh_list.append(thresh)
-    else:
-        thresh_list.append(None)
+    thresh = torch.FloatTensor([0.5])
+    if half: thresh = thresh.cuda()
 
     # eval
     gen_model.eval()
 
-    for thresh in thresh_list:
-        if half: thresh = thresh.cuda()
-        if half:
-            iouv = torch.linspace(0.5, 0.95, 10).cuda()
-        else:
-            iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
-        niou = iouv.numel()
-        nc = sim.nc
-        seen = 0
-        names = {k: v for k, v in enumerate(app_model.names if hasattr(app_model, 'names') else app_model.module.names)}
-        coco91class = coco80_to_coco91_class()
-        p, r, f1, mp, mr, map50, map = 0., 0., 0., 0., 0., 0., 0.
-        stats, ap, ap_class = [], [], []
-        test_iter = tqdm(test_loader)
-        rlcr = AverageMeter()
-        for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
-            img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
-            img /= 255.0  # 0 - 255 to 0.0 - 1.0
-            if half:targets = targets.cuda()
-            nb, _, height, width = img.shape  # batch size, channels, height, width
+    if half:
+        iouv = torch.linspace(0.5, 0.95, 10).cuda()
+    else:
+        iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+    niou = iouv.numel()
+    nc = sim.nc
+    seen = 0
+    names = {k: v for k, v in enumerate(app_model.names if hasattr(app_model, 'names') else app_model.module.names)}
+    coco91class = coco80_to_coco91_class()
+    p, r, f1, mp, mr, map50, map = 0., 0., 0., 0., 0., 0., 0.
+    stats, ap, ap_class = [], [], []
+    test_iter = tqdm(test_loader)
+    rlcr = AverageMeter()
+    for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
+        img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if half:targets = targets.cuda()
+        nb, _, height, width = img.shape  # batch size, channels, height, width
 
-            # Run model
-            with torch.no_grad():
-                if use_subsampling:
-                    recon,res = gen_model((img,thresh))
-                else:
-                    recon,r = gen_model(img)
-                pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
-                _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
-               
-                if use_subsampling:
-                    esti_cr,real_cr,std = res
-            rlcr.update(real_cr if use_subsampling else r)
-                
-            # Run NMS
-            if half:
-                targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+        # Run model
+        with torch.no_grad():
+            if use_subsampling:
+                recon,res = gen_model((img,thresh))
             else:
-                targets[:, 2:] *= torch.Tensor([width, height, width, height])
+                recon,r = gen_model(img)
+            pred,recon_features = app_model(recon, augment=opt.augment, extract_features=True)
+            _,origin_features = app_model(img, augment=opt.augment, extract_features=True)
+           
+            if use_subsampling:
+                esti_cr,real_cr,std = res
+        rlcr.update(real_cr if use_subsampling else r)
+            
+        # Run NMS
+        if half:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height]).cuda()
+        else:
+            targets[:, 2:] *= torch.Tensor([width, height, width, height])
 
-            lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
+        lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if opt.save_hybrid else []  # for autolabelling
 
-            out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
+        out = non_max_suppression(pred[0], conf_thres=opt.conf_thres, iou_thres=opt.iou_thres, labels=lb, multi_label=True)
 
 
-            # Statistics per image
-            for si, pred in enumerate(out):
-                labels = targets[targets[:, 0] == si, 1:]
-                nl = len(labels)
-                tcls = labels[:, 0].tolist() if nl else []  # target class
-                seen += 1
+        # Statistics per image
+        for si, pred in enumerate(out):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl = len(labels)
+            tcls = labels[:, 0].tolist() if nl else []  # target class
+            seen += 1
 
-                if len(pred) == 0:
-                    if nl:
-                        stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
-                    continue
-
-                # Predictions
-                predn = pred.clone()
-                scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
-
-                # Assign all predictions as incorrect
-                if half:
-                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
-                else:
-                    correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+            if len(pred) == 0:
                 if nl:
-                    detected = []  # target indices
-                    tcls_tensor = labels[:, 0]
+                    stats.append((torch.zeros(0, niou, dtype=torch.bool), torch.Tensor(), torch.Tensor(), tcls))
+                continue
 
-                    # target boxes
-                    tbox = xywh2xyxy(labels[:, 1:5])
-                    scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
+            # Predictions
+            predn = pred.clone()
+            scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
 
-                    # Per target class
-                    for cls in torch.unique(tcls_tensor):
-                        ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
-                        pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
+            # Assign all predictions as incorrect
+            if half:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool).cuda()
+            else:
+                correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool)
+            if nl:
+                detected = []  # target indices
+                tcls_tensor = labels[:, 0]
 
-                        # Search for detections
-                        if pi.shape[0]:
-                            # Prediction to target ious
-                            ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
+                # target boxes
+                tbox = xywh2xyxy(labels[:, 1:5])
+                scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
 
-                            # Append detections
-                            detected_set = set()
-                            for j in (ious > iouv[0]).nonzero(as_tuple=False):
-                                d = ti[i[j]]  # detected target
-                                if d.item() not in detected_set:
-                                    detected_set.add(d.item())
-                                    detected.append(d)
-                                    correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
-                                    if len(detected) == nl:  # all targets already located in image
-                                        break
+                # Per target class
+                for cls in torch.unique(tcls_tensor):
+                    ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
+                    pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
 
-                # Append statistics (correct, conf, pcls, tcls)
-                stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
+                    # Search for detections
+                    if pi.shape[0]:
+                        # Prediction to target ious
+                        ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
 
-            if batch_i%100==0 or batch_i==(len(test_loader)-1):
-                metric = stat_to_map(stats,names,nc)
-                if use_subsampling:
-                    test_iter.set_description(
-                        f"Test: {epoch:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
-                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
-                        f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss: {loss.cpu().item():.3f}. "
-                        f"cr: {rlcr.avg:.5f}. "
-                        )
-                else:
-                    test_iter.set_description(
-                        f"Test: {epoch:3}. "
-                        f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
-                        f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
-                        f"loss: {loss.cpu().item():.3f}. "
-                        f"r: {rlcr.avg:.5f}. "
-                        )
-        with open("raw_eval.log" if use_subsampling else "original_eval.log", "a") as f:
-            f.write(f"{metric[3]:.3f} {rlcr.avg:.5f}\n")
-        test_iter.close()
+                        # Append detections
+                        detected_set = set()
+                        for j in (ious > iouv[0]).nonzero(as_tuple=False):
+                            d = ti[i[j]]  # detected target
+                            if d.item() not in detected_set:
+                                detected_set.add(d.item())
+                                detected.append(d)
+                                correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
+                                if len(detected) == nl:  # all targets already located in image
+                                    break
 
-        #0.49,0.00489
+            # Append statistics (correct, conf, pcls, tcls)
+            stats.append((correct.cpu(), pred[:, 4].detach().cpu(), pred[:, 5].detach().cpu(), tcls))
 
+        if batch_i%100==0 or batch_i==(len(test_loader)-1):
+            metric = stat_to_map(stats,names,nc)
+            if use_subsampling:
+                test_iter.set_description(
+                    f"Test: {batch_i:3}. Thresh: {thresh.cpu().numpy()[0]:.3f}. "
+                    f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
+                    f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                    f"cr: {rlcr.avg:.5f}. "
+                    )
+            else:
+                test_iter.set_description(
+                    f"Test: {batch_i:3}. "
+                    f"map50: {metric[3]:.3f}. map: {metric[4]:.2f}. "
+                    f"MP: {metric[1]:.2f}. MR: {metric[2]:.2f}. "
+                    f"r: {rlcr.avg:.5f}. "
+                    )
+    with open("raw_eval.log" if use_subsampling else "original_eval.log", "a") as f:
+        f.write(f"{metric[3]:.3f} {rlcr.avg:.5f}\n")
+    test_iter.close()
+
+    #0.49,0.00489
+
+def deepcod_avgsize():
+    from compression.deepcod import DeepCOD, orthorgonal_regularizer, init_weights
+    sim = Simulator(train=False,use_model=True)
+
+    opt = sim.opt
+    device = select_device(opt.device, batch_size=opt.batch_size)
+    half = opt.device != 'cpu'
+    use_subsampling=True
+    # data
+    test_loader = sim.dataloader
+
+    # vision app
+    app_model = sim.model
+    if half:
+        app_model = app_model.cuda()
+        for layer in app_model.modules():
+            if isinstance(layer, nn.BatchNorm2d):
+                layer.float()
+    app_model.eval()
+
+    # encoder+decoder
+    PATH = 'backup/CCO-pre2.pth' if use_subsampling else 'backup/deepcod_soft_c8.pth'
+    gen_model = DeepCOD(use_subsampling=use_subsampling)
+    gen_model.load_state_dict(torch.load(PATH,map_location='cpu'))
+    if opt.device != 'cpu':
+        gen_model = gen_model.cuda()
+
+    # thresh to evaluate
+    thresh = torch.FloatTensor([0.5])
+    if half: thresh = thresh.cuda()
+
+    # eval
+    gen_model.eval()
+
+    if half:
+        iouv = torch.linspace(0.5, 0.95, 10).cuda()
+    else:
+        iouv = torch.linspace(0.5, 0.95, 10).to(device)  # iou vector for mAP@0.5:0.95
+    niou = iouv.numel()
+    nc = sim.nc
+    seen = 0
+    names = {k: v for k, v in enumerate(app_model.names if hasattr(app_model, 'names') else app_model.module.names)}
+    coco91class = coco80_to_coco91_class()
+    p, r, f1, mp, mr, map50, map = 0., 0., 0., 0., 0., 0., 0.
+    stats, ap, ap_class = [], [], []
+    test_iter = tqdm(test_loader)
+    size = AverageMeter()
+    for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
+        img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        if half:targets = targets.cuda()
+        nb, _, height, width = img.shape  # batch size, channels, height, width
+        size.update(height*width*3*8/1024/1024)
+        test_iter.set_description(
+                    f"Test: {batch_i:3}. "
+                    f"sz: {size.avg:.5f}. "
+                    )
 
 def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
     device = select_device(opt.device, batch_size=opt.batch_size)

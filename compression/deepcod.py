@@ -9,7 +9,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
-from huffman import HuffmanCoding
+from compression.huffman import HuffmanCoding
 
 
 class Middle_conv(nn.Module):
@@ -39,8 +39,8 @@ class DeepCOD(nn.Module):
 		self.output_conv = Output_conv(no_of_hidden_units)
 		
 
-	def forward(self, x): 
-		x,r = self.encoder(x)
+	def forward(self, x):
+		x,r,t = self.encoder(x)
 
 		# reconstruct
 		x = self.conv1(x)
@@ -48,6 +48,7 @@ class DeepCOD(nn.Module):
 		x = self.conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
+		print(time.perf_counter()-t)
 		
 		return x,r
 def orthorgonal_regularizer(w,scale,cuda=False):
@@ -198,22 +199,24 @@ class LightweightEncoder(nn.Module):
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
 			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
+			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
+			soft_prob = torch.mean(softmax_dist,dim=0)
+			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
+			start = time.perf_counter()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
 			real_size += rle_len1
 			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
-			soft_prob = torch.mean(softmax_dist,dim=0)
-			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
-			return x,(filter_loss,real_cr,entropy)
+			return x,(filter_loss,real_cr,entropy),start
 		else:
 			huffman = HuffmanCoding()
+			start = time.perf_counter()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
-			return x,real_cr
+			return x,real_cr,start
 
 def mask_compression(mask):
 	prev = 1
