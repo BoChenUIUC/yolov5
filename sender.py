@@ -25,7 +25,7 @@ def deepcod_send():
 		size = int(224*224*3*cr)
 		data = bytearray(os.urandom(size))
 		data = struct.pack(">L", len(data))+data
-		for i in range(5):
+		for i in range(10):
 			time_str = str(datetime.datetime.now())
 			print(cr,size,len(data))
 			client.send(str.encode(time_str)+data)
