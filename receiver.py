@@ -11,6 +11,9 @@ from compression.transformer import Transformer
 import struct
 import socket
 
+# 11.676-11.213
+# 27.6337-27.7133
+time_offset = 0.1917
 def deepcod_recv():
 	import datetime
 	payload_size = struct.calcsize(">L")
@@ -28,7 +31,7 @@ def deepcod_recv():
 		# decode time
 		while len(data) < 26:
 			data += conn.recv(4096)
-		edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f")
+		edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f") - datetime.timedelta(seconds=time_offset)
 		data = data[26:]
 		while len(data) < payload_size:
 			data += conn.recv(4096)

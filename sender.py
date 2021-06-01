@@ -19,16 +19,15 @@ def deepcod_send():
 	ADDR = ("10.194.65.210",8848)
 	client.connect(ADDR)
 
-	crs = [0,0.0039,0.0049,0.024,0.036,0.166]
+	crs = [0.0039,0.0049,0.024,0.036,0.166]
 
 	for cr in crs:
 		size = int(224*224*3*cr)
 		data = bytearray(os.urandom(size))
 		data = struct.pack(">L", len(data))+data
-		for i in range(10):
-			time_str = str(datetime.datetime.now())
-			print(cr,size,len(data))
-			client.send(str.encode(time_str)+data)
+		time_str = str(datetime.datetime.now())
+		print(cr,size,len(data))
+		client.send(str.encode(time_str)+data)
 	client.close()
 
 if __name__ == "__main__":
