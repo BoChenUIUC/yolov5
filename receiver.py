@@ -15,7 +15,7 @@ def deepcod_recv():
 	import datetime
 	payload_size = struct.calcsize(">L")
 	serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	ADDR = ("130.126.136.154",8848)
+	ADDR = ("10.194.65.210",8848)
 	# ADDR = ("127.0.0.1",8848)
 	serv.bind(ADDR)
 	serv.listen(5)
@@ -29,6 +29,7 @@ def deepcod_recv():
 		while len(data) < 26:
 			data += conn.recv(4096)
 		edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f")
+		data = data[26:]
 		while len(data) < payload_size:
 			data += conn.recv(4096)
 		msg_size = struct.unpack(">L", data[:payload_size])[0]
@@ -39,7 +40,7 @@ def deepcod_recv():
 			data += tmp_str
 		cloud_recv_time = datetime.datetime.now()
 		diff = (cloud_recv_time - edge_send_time).total_seconds()
-		print('Received:',len(data),diff)
+		print('Received:',msg_size,len(data),diff)
 		data = data[msg_size:]
 
 if __name__ == "__main__":
