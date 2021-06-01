@@ -32,8 +32,10 @@ def speed_test(EXP_NAME):
 
 def test():
 	from app import deepcod_validate,deepcod_avgsize
-	deepcod_validate()
+	# deepcod_validate()
 	# deepcod_avgsize()
+	from compression.deepcod import test_speed
+	test_speed(True)
 
 if __name__ == "__main__":
 	np.random.seed(123)
@@ -42,5 +44,5 @@ if __name__ == "__main__":
 	# test 
 	test()
 
-	# for name in ['JPEG','Scale','WebP']:
-	# 	speed_test(name)
+	for name in ['JPEG','Scale','WebP']:
+		speed_test(name)

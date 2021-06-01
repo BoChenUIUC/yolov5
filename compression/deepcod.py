@@ -48,7 +48,7 @@ class DeepCOD(nn.Module):
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
-		return x,r
+		return x,r,t
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
 	w = w.view(N*C, H, W)
@@ -256,19 +256,24 @@ def init_weights(m):
 		nn.init.kaiming_normal_(m.weight, mode='fan_out')
 		# nn.init.constant_(m.bias, 0)
 
-if __name__ == '__main__':
+def test_speed(cuda):
 	torch.manual_seed(1)
-	image = torch.randn(1,3,32,32)
-	model = DeepCOD()
-	output = model((image,0.5))
-	print(model)
-	print(model.encoder.ctx.conv1.bias)
-	# print(output.shape)
-	# weight = torch.diag(torch.ones(4)).repeat(3,3,1,1)
-	# print(weight.size())
-	# print(model.encoder.sample.weight.size())
-	# r = orthorgonal_regularizer(model.sample.weight,1,False)
-	# print(r)
-	# for name, param in model.named_parameters():
-	# 	print('name is {}'.format(name))
-	# 	print('shape is {}'.format(param.shape))
+	t1,t2 = 0,0
+	image = torch.randn(1,3,224,224)
+	model = DeepCOD(use_subsampling=0)
+	model2 = DeepCOD(use_subsampling=1)
+	if cuda:
+		image = image.cuda()
+		model = model.cuda()
+		model2 = model2.cuda()
+	for i in range(10):
+		x,r,dt1 = model((image))
+		t1 += dt1 
+		x,r,dt2 = model2((image,0.5))
+		t2 += dt2
+		print(i,dt1,dt2)
+	print(t1/10,t2/10)
+
+if __name__ == '__main__':
+	test_speed(False)
+	

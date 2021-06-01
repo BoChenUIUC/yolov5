@@ -1027,15 +1027,20 @@ def deepcod_avgsize():
     stats, ap, ap_class = [], [], []
     test_iter = tqdm(test_loader)
     size = AverageMeter()
+    aw,ah = AverageMeter(),AverageMeter()
     for batch_i, (img, targets, paths, shapes) in enumerate(test_iter):
         img = img.type(torch.FloatTensor).cuda() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         if half:targets = targets.cuda()
         nb, _, height, width = img.shape  # batch size, channels, height, width
         size.update(height*width*3*8/1024/1024)
+        aw.update(1.0*width)
+        ah.update(1.0*height)
         test_iter.set_description(
                     f"Test: {batch_i:3}. "
                     f"sz: {size.avg:.5f}. "
+                    f"w: {aw.avg:.5f}. "
+                    f"h: {ah.avg:.5f}. "
                     )
 
 def run_model_multi_range(opt,model,dataloader,nc,ranges,TF=None,C_param=None):
