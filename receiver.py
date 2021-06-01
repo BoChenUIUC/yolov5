@@ -33,6 +33,7 @@ def deepcod_recv():
 	# connect to edge
 	print('Connected.')
 	data = b""
+	cnt,total = 0,0
 	while True:
 		# decode time
 		while len(data) < 26:
@@ -50,6 +51,10 @@ def deepcod_recv():
 		cloud_recv_time = datetime.datetime.now()
 		diff = (cloud_recv_time - edge_send_time).total_seconds()
 		print('Received:',msg_size,len(data),diff)
+		cnt += 1
+		total += diff
+		if cnt == 10:
+			print('Avg:',total/10.0)
 		data = data[msg_size:]
 
 if __name__ == "__main__":
