@@ -40,7 +40,7 @@ if __name__ == "__main__":
 	torch.manual_seed(2)
 
 	# test 
-	test()
+	# test()
 
 	for name in ['JPEG','Scale','WebP']:
 		speed_test(name)
