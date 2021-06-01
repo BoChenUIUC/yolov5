@@ -263,9 +263,11 @@ def test_speed(cuda):
 	model = DeepCOD(use_subsampling=0)
 	model2 = DeepCOD(use_subsampling=1)
 	if cuda:
+		print('move to cuda')
 		image = image.cuda()
 		model = model.cuda()
 		model2 = model2.cuda()
+	print('start')
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
