@@ -11,14 +11,20 @@ from compression.transformer import Transformer
 import struct
 import socket
 
+# eceived: 587 4066 -0.038248  3.89
+# Received: 737 3449 -0.038131 4.02
+# Received: 3612 6778 -0.038024 4.775
+# Received: 5419 7232 -0.037943
+# Received: 24987 24987 -0.037829
+
 # 11.676-11.213
 # 27.6337-27.7133
-time_offset = 0.1917
+time_offset = 0
 def deepcod_recv():
 	import datetime
 	payload_size = struct.calcsize(">L")
 	serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	ADDR = ("10.194.65.210",8848)
+	ADDR = ("130.126.136.154",8000)
 	# ADDR = ("127.0.0.1",8848)
 	serv.bind(ADDR)
 	serv.listen(5)
