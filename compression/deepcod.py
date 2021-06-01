@@ -277,5 +277,5 @@ def test_speed(cuda):
 	print(t1/10,t2/10)
 
 if __name__ == '__main__':
-	test_speed(True)
+	test_speed(False)
 	
