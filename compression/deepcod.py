@@ -9,7 +9,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 from torch.autograd import Variable
 from torch.nn.utils import spectral_norm
-from compression.huffman import HuffmanCoding
+from huffman import HuffmanCoding
 
 
 class Middle_conv(nn.Module):
