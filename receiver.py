@@ -50,11 +50,11 @@ def deepcod_recv():
 			data += tmp_str
 		cloud_recv_time = datetime.datetime.now()
 		diff = (cloud_recv_time - edge_send_time).total_seconds()
-		print('Received:',msg_size,len(data),diff)
+		# print('Received:',msg_size,len(data),diff)
 		cnt += 1
 		total += diff
 		if cnt == 10:
-			print('Avg:',total/10.0)
+			print('Avg:',msg_size,total/10.0)
 			cnt = 0
 			total = 0
 		data = data[msg_size:]
