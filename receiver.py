@@ -24,7 +24,7 @@ def deepcod_recv():
 	import datetime
 	payload_size = struct.calcsize(">L")
 	serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	ADDR = ("130.126.136.154",8000)
+	ADDR = ("130.126.136.154",8080)
 	# ADDR = ("127.0.0.1",8848)
 	serv.bind(ADDR)
 	serv.listen(5)

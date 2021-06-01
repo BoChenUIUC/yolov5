@@ -16,7 +16,7 @@ import datetime
 def deepcod_send():
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	# ADDR = ("127.0.0.1",8848)
-	ADDR = ("130.126.136.154",8000)
+	ADDR = ("130.126.136.154",8080)
 	client.connect(ADDR)
 
 	crs = [0.0039,0.0049,0.024,0.036,0.166]
