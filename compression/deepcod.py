@@ -198,14 +198,14 @@ class LightweightEncoder(nn.Module):
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
 			quant_dist = torch.pow(comp_data-self.centers, 2)
 			index = torch.min(quant_dist, dim=-1, keepdim=True)[1]
-			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
-			soft_prob = torch.mean(softmax_dist,dim=0)
-			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
 			# running length coding on bitmap
 			huffman = HuffmanCoding()
 			real_size = len(huffman.compress(index.view(-1).cpu().numpy())) * 4 # bit
 			rle_len1 = mask_compression(mask_1.view(-1).cpu().numpy())
 			dur = time.perf_counter() - start
+			softmax_dist = nn.functional.softmax(-quant_dist, dim=-1)
+			soft_prob = torch.mean(softmax_dist,dim=0)
+			entropy = -torch.sum(torch.mul(soft_prob,torch.log(soft_prob)))
 			real_size += rle_len1
 			filter_loss = torch.mean(feat_1)
 			real_cr = 1/16.*real_size/(H*W*C*B*8)
