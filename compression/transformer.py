@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import torch.nn as nn
 import torch.nn.functional as F
-from compression.turbojpeg import TurboJPEG
-from compression.huffman import HuffmanCoding
+# from compression.turbojpeg import TurboJPEG
+# from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
 
@@ -608,6 +608,38 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	end = time.perf_counter()
 	return lossy_image,osize,csize,end-start
 
+def test_speed():
+	image = cv2.imread('sample.jpg')
+	# jpeg
+	jt = 0
+	for r in [7,11,15,21,47,100]:
+		encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), r]
+		start = time.perf_counter()
+		result, lossy_image = cv2.imencode('.jpg', image, encode_param)
+		end = time.perf_counter()
+		jt += end-start
+	print('jpeg:',jt/6)
+	# WebP
+	wt = 0
+	for r in [0,5,37,100]:
+		encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), r]
+		start = time.perf_counter()
+		result, lossy_image = cv2.imencode('.webp', image, encode_param)
+		end = time.perf_counter()
+		wt += end-start
+	print('webp:',wt/4)
+	# scale
+	st = 0
+	for r in [0.1*x for x in range(1,11)]:
+		img_h,img_w = image.shape[:2]
+		dsize = (int(img_w*r),int(r*img_h))
+		start = time.perf_counter() 
+		compressed = cv2.resize(image, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+		end = time.perf_counter()
+		st += end-start
+	print('scale:',st/10)
+
+
 def JPEG(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
@@ -767,4 +799,5 @@ if __name__ == "__main__":
     # PNG(img,9)
     # _,osize,csize = JPEG2000(img,100)
     # print(osize,csize)
-    test_dataloader()
+    # test_dataloader()
+    test_speed()
