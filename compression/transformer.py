@@ -11,8 +11,6 @@ from PIL import Image
 from io import StringIO
 import pickle,sys,os
 import subprocess
-import matplotlib.pyplot as plt
-import matplotlib
 import torch.nn as nn
 import torch.nn.functional as F
 # from compression.turbojpeg import TurboJPEG
@@ -198,6 +196,8 @@ class LRU(OrderedDict):
 
 def heatmap(data, row_labels, col_labels, ax=None,
 			cbar_kw={}, cbarlabel="", **kwargs):
+	import matplotlib.pyplot as plt
+	import matplotlib
 	if not ax:
 		ax = plt.gca()
 
@@ -237,6 +237,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
 def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
 					 textcolors=("black", "white"),
 					 threshold=None, **textkw):
+	import matplotlib
 
 	if not isinstance(data, (list, np.ndarray)):
 		data = im.get_array()
