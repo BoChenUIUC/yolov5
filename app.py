@@ -1033,6 +1033,7 @@ def deepcod_avgsize():
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
         if half:targets = targets.cuda()
         nb, _, height, width = img.shape  # batch size, channels, height, width
+        print(height,width)
         size.update(height*width*3*8/1024/1024)
         aw.update(1.0*width)
         ah.update(1.0*height)
