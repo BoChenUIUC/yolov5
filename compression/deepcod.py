@@ -138,7 +138,6 @@ class ContextExtractor(nn.Module):
 		x = (torch.tanh(x)+1)/2
 		return x
 
-
 class LightweightEncoder(nn.Module):
 
 	def __init__(self, channels, kernel_size=4, num_centers=8, use_subsampling=True):
