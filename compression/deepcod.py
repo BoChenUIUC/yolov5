@@ -258,7 +258,7 @@ def init_weights(m):
 def test_speed(cuda):
 	torch.manual_seed(1)
 	t1,t2 = 0,0
-	image = torch.randn(1,3,192,192)
+	image = torch.randn(1,3,128,128)
 	model = DeepCOD(use_subsampling=0)
 	model2 = DeepCOD(use_subsampling=1)
 	if cuda:
