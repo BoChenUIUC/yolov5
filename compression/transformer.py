@@ -613,69 +613,6 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 	lossy_image = jpeg.decode(jpegraw,feature_encoding)
 	end = time.perf_counter()
 	return lossy_image,osize,csize,end-start
-
-def test_speed():
-	image = cv2.imread('sample.jpg')
-	# # J2k
-	# j2t = 0
-	# for r in range(6):
-	# 	_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
-	# 	j2t += t
-	# print('JPEG2000',j2t/6)
-	# CCVE-J
-	cjt = 0
-	selected_ranges = [1,32,42,51,58,72,197]
-	with open('Tiled_MOBO_pf.log','r') as f:
-		for lidx,line in enumerate(f.readlines()):
-			if lidx not in selected_ranges:continue
-			tmp = line.strip().split(' ')
-			C_param = np.array([float(n) for n in tmp[2:]])
-			_,_,_,t = tile_encoder(image, C_param, None, 0, snapshot=False)
-			if lidx !=1:
-				cjt += t
-	print('CCVE-J',cjt/6)
-	# CCVE-L
-	ljt = 0
-	selected_ranges = [1,50, 58, 69, 85, 108,170]
-	with open('TiledLegacy_MOBO_pf.log','r') as f:
-		for lidx,line in enumerate(f.readlines()):
-			if lidx not in selected_ranges:continue
-			tmp = line.strip().split(' ')
-			C_param = np.array([float(n) for n in tmp[2:]])
-			_,_,_,t = tile_legacy(image, C_param, 0, snapshot=False)
-			if lidx !=1:
-				ljt += t
-	print('CCVE-L',ljt/6)
-	# jpeg
-	jt = 0
-	for r in [7,11,15,21,47,100]:
-		encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), r]
-		start = time.perf_counter()
-		result, lossy_image = cv2.imencode('.jpg', image, encode_param)
-		end = time.perf_counter()
-		jt += end-start
-	print('jpeg:',jt/6)
-	# WebP
-	wt = 0
-	for r in [0,5,37,100]:
-		encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), r]
-		start = time.perf_counter()
-		result, lossy_image = cv2.imencode('.webp', image, encode_param)
-		end = time.perf_counter()
-		wt += end-start
-	print('webp:',wt/4)
-	# scale
-	st = 0
-	for r in [0.1*x for x in range(1,11)]:
-		img_h,img_w = image.shape[:2]
-		dsize = (int(img_w*r),int(r*img_h))
-		start = time.perf_counter() 
-		compressed = cv2.resize(image, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-		end = time.perf_counter()
-		st += end-start
-	print('scale:',st/10)
-
-
 def JPEG(npimg,C_param):
 	encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), C_param]
 	osize = len(pickle.dumps(npimg, 0))
@@ -826,6 +763,69 @@ def test_dataloader():
 				cv2.imwrite('2.png',jpegimg)
 				cv2.imwrite('3.png',jp2img)
 				exit(0)
+
+
+def test_speed():
+	image = cv2.imread('sample.jpg')
+	# J2k
+	j2t = 0
+	for r in range(6):
+		_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
+		j2t += t
+	print('JPEG2000',j2t/6)
+	CCVE-J
+	cjt = 0
+	selected_ranges = [1,32,42,51,58,72,197]
+	with open('Tiled_MOBO_pf.log','r') as f:
+		for lidx,line in enumerate(f.readlines()):
+			if lidx not in selected_ranges:continue
+			tmp = line.strip().split(' ')
+			C_param = np.array([float(n) for n in tmp[2:]])
+			_,_,_,t = tile_encoder(image, C_param, None, 0, snapshot=False)
+			if lidx !=1:
+				cjt += t
+	print('CCVE-J',cjt/6)
+	# CCVE-L
+	ljt = 0
+	selected_ranges = [1,50, 58, 69, 85, 108,170]
+	with open('TiledLegacy_MOBO_pf.log','r') as f:
+		for lidx,line in enumerate(f.readlines()):
+			if lidx not in selected_ranges:continue
+			tmp = line.strip().split(' ')
+			C_param = np.array([float(n) for n in tmp[2:]])
+			_,_,_,t = tile_legacy(image, C_param, 0, snapshot=False)
+			if lidx !=1:
+				ljt += t
+	print('CCVE-L',ljt/6)
+	# jpeg
+	jt = 0
+	for r in [7,11,15,21,47,100]:
+		encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), r]
+		start = time.perf_counter()
+		result, lossy_image = cv2.imencode('.jpg', image, encode_param)
+		end = time.perf_counter()
+		jt += end-start
+	print('jpeg:',jt/6)
+	# WebP
+	wt = 0
+	for r in [0,5,37,100]:
+		encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), r]
+		start = time.perf_counter()
+		result, lossy_image = cv2.imencode('.webp', image, encode_param)
+		end = time.perf_counter()
+		wt += end-start
+	print('webp:',wt/4)
+	# scale
+	st = 0
+	for r in [0.1*x for x in range(1,11)]:
+		img_h,img_w = image.shape[:2]
+		dsize = (int(img_w*r),int(r*img_h))
+		start = time.perf_counter() 
+		compressed = cv2.resize(image, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+		end = time.perf_counter()
+		st += end-start
+	print('scale:',st/10)
+
 
 if __name__ == "__main__":
     # img = cv2.imread('/home/bo/research/dataset/ucf24/compressed/000000.jpg')
