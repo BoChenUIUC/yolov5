@@ -363,7 +363,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	tile_size = tilew * tileh
 	huffman = HuffmanCoding()
 	end = time.perf_counter()
-	total_time = end-start
+	total_time = 0
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
 		crop = bgr_frame[y1:y2,x1:x2].copy()
@@ -375,13 +375,13 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
 			try:
-				t1 = time.perf_counter()
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-				t2 = time.perf_counter()
-				total_time += t2-t1
 				# compressed_size += len(pickle.dumps(crop_d, 0))
 				compressed_size += len(huffman.compress(crop_d.reshape(-1)))
+				t1 = time.perf_counter()
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
+				t2 = time.perf_counter()
+				total_time += t2-t1
 			except Exception as e:
 				print(repr(e))
 				print(C_param,tile_sizes)
@@ -767,13 +767,13 @@ def test_dataloader():
 
 def test_speed():
 	image = cv2.imread('sample.jpg')
-	# J2k
-	j2t = 0
-	for r in range(6):
-		_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
-		j2t += t
-	print('JPEG2000',j2t/6)
-	CCVE-J
+	# # J2k
+	# j2t = 0
+	# for r in range(6):
+	# 	_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
+	# 	j2t += t
+	# print('JPEG2000',j2t/6)
+	# CCVE-J
 	cjt = 0
 	selected_ranges = [1,32,42,51,58,72,197]
 	with open('Tiled_MOBO_pf.log','r') as f:
@@ -801,8 +801,9 @@ def test_speed():
 	jt = 0
 	for r in [7,11,15,21,47,100]:
 		encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), r]
-		start = time.perf_counter()
 		result, lossy_image = cv2.imencode('.jpg', image, encode_param)
+		start = time.perf_counter()
+		lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 		end = time.perf_counter()
 		jt += end-start
 	print('jpeg:',jt/6)
@@ -810,8 +811,9 @@ def test_speed():
 	wt = 0
 	for r in [0,5,37,100]:
 		encode_param = [int(cv2.IMWRITE_WEBP_QUALITY), r]
-		start = time.perf_counter()
 		result, lossy_image = cv2.imencode('.webp', image, encode_param)
+		start = time.perf_counter()
+		lossy_image = cv2.imdecode(lossy_image, cv2.IMREAD_COLOR)
 		end = time.perf_counter()
 		wt += end-start
 	print('webp:',wt/4)
@@ -820,8 +822,9 @@ def test_speed():
 	for r in [0.1*x for x in range(1,11)]:
 		img_h,img_w = image.shape[:2]
 		dsize = (int(img_w*r),int(r*img_h))
-		start = time.perf_counter() 
 		compressed = cv2.resize(image, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+		start = time.perf_counter() 
+		compressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 		end = time.perf_counter()
 		st += end-start
 	print('scale:',st/10)
