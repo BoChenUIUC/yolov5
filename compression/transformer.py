@@ -616,12 +616,12 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 
 def test_speed():
 	image = cv2.imread('sample.jpg')
-	# J2k
-	j2t = 0
-	for r in range(6):
-		_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
-		j2t += t
-	print('JPEG2000',j2t/6)
+	# # J2k
+	# j2t = 0
+	# for r in range(6):
+	# 	_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
+	# 	j2t += t
+	# print('JPEG2000',j2t/6)
 	# CCVE-J
 	cjt = 0
 	selected_ranges = [1,32,42,51,58,72,197]
