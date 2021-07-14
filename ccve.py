@@ -627,14 +627,14 @@ if __name__ == "__main__":
 
 	# test 
 	# test()
-	cco_mobo()
+	# cco_mobo()
 
 	# samples for eval
 	# generate_image_samples('Tiled')
 
 	# speed test
-	# for name in ['Scale']:
-	# 	speed_test(name)
+	for name in ['Tiled','TiledLegacy','JPEG','WebP','Scale','JPEG2000']:
+		speed_test(name)
 
 	# 1. determine lenght of episode
 	# test_run()

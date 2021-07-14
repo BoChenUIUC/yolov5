@@ -13,8 +13,8 @@ import pickle,sys,os
 import subprocess
 import torch.nn as nn
 import torch.nn.functional as F
-# from compression.turbojpeg import TurboJPEG
-# from compression.huffman import HuffmanCoding
+from compression.turbojpeg import TurboJPEG
+from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
 
@@ -359,6 +359,8 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	original_size = 0
 	tile_size = tilew * tileh
 	huffman = HuffmanCoding()
+	end = time.perf_counter()
+	total_time = end-start
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
 		crop = bgr_frame[y1:y2,x1:x2].copy()
@@ -370,7 +372,10 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 			bgr_frame[y1:y2,x1:x2] = [0]
 		else:
 			try:
+				t1 = time.perf_counter()
 				crop_d = cv2.resize(crop, dsize=dsize, interpolation=cv2.INTER_LINEAR)
+				t2 = time.perf_counter()
+				total_time += t2-t1
 				# compressed_size += len(pickle.dumps(crop_d, 0))
 				compressed_size += len(huffman.compress(crop_d.reshape(-1)))
 				crop = cv2.resize(crop_d, dsize=(x2-x1,y2-y1), interpolation=cv2.INTER_LINEAR)
@@ -381,10 +386,9 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 				exit(1)
 			bgr_frame[y1:y2,x1:x2] = crop
 
-	end = time.perf_counter()
 	if toSave:
 		cv2.imwrite(f'samples/{counter:2}_compressed.jpg',bgr_frame)
-	return bgr_frame,original_size,compressed_size,end-start
+	return bgr_frame,original_size,compressed_size,total_time
 
 def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	start = time.perf_counter()
@@ -399,13 +403,12 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# FAST
 	fast = get_FAST(bgr_frame)
 	# STAR
-	# star = get_STAR(bgr_frame)
+	star = get_STAR(bgr_frame)
 	# # ORB
-	# orb = get_ORB(bgr_frame)
-	star = get_SIFT(bgr_frame)
+	# star = get_SIFT(bgr_frame)
 	# ORB
-	# orb = get_ORB(bgr_frame)
-	orb = get_GFTT(bgr_frame)
+	orb = get_ORB(bgr_frame)
+	# orb = get_GFTT(bgr_frame)
 
 	point_features = [fast, star, orb]
 	num_features = len(point_features)
@@ -420,7 +423,7 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	
 	# whether to scale the tile
 	scaler = 1
-	assert(len(C_param)==num_features+4)
+	assert(len(C_param)==num_features+3)
 	if len(C_param)>num_features+3:
 		scaler = int(((C_param[num_features+3]+0.5)*10)) + 1
 		scaler = min(scaler,10); scaler = max(scaler,1)
@@ -486,11 +489,12 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 
 	original_size = len(pickle.dumps(bgr_frame, 0))
 	feature_encoding = np.clip(np.rint(quality*100),1,100).astype(np.uint8)
-	# feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*85
-	jpegraw = jpeg.encode(bgr_frame,feature_encoding)
-	compressed_size = len(jpegraw)
 	end = time.perf_counter()
-	bgr_frame = jpeg.decode(jpegraw,feature_encoding)
+	compressed_size = original_size
+	# feature_encoding = np.ones(widthInBlock*heightInBlock,dtype=np.uint8)*85
+	# jpegraw = jpeg.encode(bgr_frame,feature_encoding)
+	# compressed_size = len(jpegraw)
+	# bgr_frame = jpeg.decode(jpegraw,feature_encoding)
 	if toSave:
 		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
@@ -739,8 +743,8 @@ class Transformer:
 			rimage,osize,csize,t = tile_legacy(image, C_param, self.counter, self.snapshot)
 		elif self.name == 'Tiled':	
 			rimage,osize,csize,t = tile_encoder(image, C_param, self.jpeg, self.counter, self.snapshot)
-		elif self.name == 'CNN':
-			rimage,osize,csize,t = CNN_encoder(image, C_param, self.jpeg, self.CNN, self.counter, self.snapshot)
+		# elif self.name == 'CNN':
+		# 	rimage,osize,csize,t = CNN_encoder(image, C_param, self.jpeg, self.CNN, self.counter, self.snapshot)
 		elif self.name == 'Scale':
 			rimage,osize,csize,t = tile_scaler(image, C_param)
 		else:
