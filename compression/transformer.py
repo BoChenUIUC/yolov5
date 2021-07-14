@@ -282,8 +282,8 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	# hc, _ = get_harris_corner(bgr_frame)
 	# FAST
 	fast = get_FAST(bgr_frame)
-	# STAR
-	star = get_STAR(bgr_frame)
+	# # STAR
+	# star = get_STAR(bgr_frame)
 	# ORB
 	orb = get_ORB(bgr_frame)
 
@@ -405,12 +405,9 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# FAST
 	fast = get_FAST(bgr_frame)
 	# STAR
-	star = get_STAR(bgr_frame)
-	# # ORB
-	# star = get_SIFT(bgr_frame)
+	# star = get_STAR(bgr_frame)
 	# ORB
 	orb = get_ORB(bgr_frame)
-	# orb = get_GFTT(bgr_frame)
 
 	point_features = [fast, star, orb]
 	num_features = len(point_features)
