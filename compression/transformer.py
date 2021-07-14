@@ -13,7 +13,9 @@ import pickle,sys,os
 import subprocess
 import torch.nn as nn
 import torch.nn.functional as F
-from compression.turbojpeg import TurboJPEG
+import sys
+sys.path.append('..')
+# from compression.turbojpeg import TurboJPEG
 from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
@@ -577,16 +579,15 @@ def CNN_encoder(image, C_param, jpeg, model, counter, snapshot=False):
 		cv2.imwrite(f'samples/{counter:02}_compressed.jpg',bgr_frame)
 	return bgr_frame,original_size,compressed_size,end-start
 
-def JPEG2000(npimg,C_param):
-	comp_dir = 'compression/jpeg2000/'
-	tmp_dir = comp_dir + 'tmp/'
+def JPEG2000(npimg,C_param,base='compression/jpeg2000/'):
+	tmp_dir = base + 'tmp/'
 	cv2.imwrite(tmp_dir+'origin.png',npimg)
 	osize = os.stat(tmp_dir+'origin.png').st_size
 	start = time.perf_counter()
-	comp_cmd = './'+comp_dir+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
+	comp_cmd = './'+base+'opj_compress -i '+tmp_dir+'origin.png -o '+tmp_dir+'compressed.j2k -r '+str(C_param)
 	subprocess.call(comp_cmd, shell=True)
 	end = time.perf_counter()
-	decm_cmd = './'+comp_dir+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
+	decm_cmd = './'+base+'opj_decompress -i '+tmp_dir+'compressed.j2k -o '+tmp_dir+'decompressed.png -r '+str(C_param)
 	subprocess.call(decm_cmd, shell=True)
 	lossy_image = cv2.imread(tmp_dir+'decompressed.png')
 	assert(lossy_image is not None)
@@ -615,6 +616,36 @@ def TUBBOJPEG(npimg,C_param,jpeg):
 
 def test_speed():
 	image = cv2.imread('sample.jpg')
+	# J2k
+	j2t = 0
+	for r in range(6):
+		_,_,_,t = JPEG2000(image,r,base='jpeg2000/')
+		j2t += t
+	print('JPEG2000',j2t/6)
+	# CCVE-J
+	cjt = 0
+	selected_ranges = [1,32,42,51,58,72,197]
+	with open('Tiled_MOBO_pf.log','r') as f:
+		for lidx,line in enumerate(f.readlines()):
+			if lidx not in selected_ranges:continue
+			tmp = line.strip().split(' ')
+			C_param = np.array([float(n) for n in tmp[2:]])
+			_,_,_,t = tile_encoder(image, C_param, None, 0, snapshot=False)
+			if lidx !=1:
+				cjt += t
+	print('CCVE-J',cjt/6)
+	# CCVE-L
+	ljt = 0
+	selected_ranges = [1,50, 58, 69, 85, 108,170]
+	with open('TiledLegacy_MOBO_pf.log','r') as f:
+		for lidx,line in enumerate(f.readlines()):
+			if lidx not in selected_ranges:continue
+			tmp = line.strip().split(' ')
+			C_param = np.array([float(n) for n in tmp[2:]])
+			_,_,_,t = tile_legacy(image, C_param, 0, snapshot=False)
+			if lidx !=1:
+				ljt += t
+	print('CCVE-L',ljt/6)
 	# jpeg
 	jt = 0
 	for r in [7,11,15,21,47,100]:
