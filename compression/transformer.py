@@ -287,7 +287,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	# ORB
 	orb = get_ORB(bgr_frame)
 
-	point_features = [fast, star, orb]
+	point_features = [fast, orb]
 	map_features = []
 	num_features = len(point_features) + len(map_features)
 	# snapshot features optionally
@@ -409,7 +409,7 @@ def tile_encoder(image, C_param, jpeg, counter, snapshot=False):
 	# ORB
 	orb = get_ORB(bgr_frame)
 
-	point_features = [fast, star, orb]
+	point_features = [fast, orb]
 	num_features = len(point_features)
 	# snapshot features optionally
 	if toSave:
