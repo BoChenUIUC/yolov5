@@ -11,13 +11,13 @@ from compression.ddpgbuffer import MemoryBuffer
 from sortedcontainers import SortedDict
 from tqdm import tqdm
 from app import Simulator
-import mobopt as mo
-# MOO
-from pymoo.algorithms.nsga2 import NSGA2
-from pymoo.factory import get_problem
-from pymoo.optimize import minimize
-from pymoo.visualization.scatter import Scatter
-from pymoo.model.problem import Problem
+# import mobopt as mo
+# # MOO
+# from pymoo.algorithms.nsga2 import NSGA2
+# from pymoo.factory import get_problem
+# from pymoo.optimize import minimize
+# from pymoo.visualization.scatter import Scatter
+# from pymoo.model.problem import Problem
 
 # setup
 batch_size = 1
