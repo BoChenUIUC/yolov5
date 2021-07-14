@@ -1,23 +1,23 @@
-# import cv2
-# import numpy as np
-# import time
-# import torch
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import torch.optim as optim
+import cv2
+import numpy as np
+import time
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 from compression.transformer import Transformer
-# from compression.ddpgtrain import Trainer
-# from compression.ddpgbuffer import MemoryBuffer
-# from sortedcontainers import SortedDict
-# from tqdm import tqdm
+from compression.ddpgtrain import Trainer
+from compression.ddpgbuffer import MemoryBuffer
+from sortedcontainers import SortedDict
+from tqdm import tqdm
 from app import Simulator
-# import mobopt as mo
-# # MOO
-# from pymoo.algorithms.nsga2 import NSGA2
-# from pymoo.factory import get_problem
-# from pymoo.optimize import minimize
-# from pymoo.visualization.scatter import Scatter
-# from pymoo.model.problem import Problem
+import mobopt as mo
+# MOO
+from pymoo.algorithms.nsga2 import NSGA2
+from pymoo.factory import get_problem
+from pymoo.optimize import minimize
+from pymoo.visualization.scatter import Scatter
+from pymoo.model.problem import Problem
 
 # setup
 batch_size = 1
