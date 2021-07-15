@@ -57,7 +57,7 @@ def deepcod_recv():
 			cnt = 0
 			total = 0
 
-		conn.send(struct.pack(">L", msg_size))+data[:msg_size])
+		conn.send(struct.pack(">L", msg_size)+data[:msg_size])
 		data = data[msg_size:]
 
 if __name__ == "__main__":
