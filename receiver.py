@@ -44,7 +44,7 @@ def deepcod_recv():
 			data += tmp_str
 		print('Received:',msg_size,len(data))
 
-		conn.send(struct.pack(">L", msg_size)+data[:msg_size])
+		conn.send(data[:msg_size])
 		data = data[msg_size:]
 
 if __name__ == "__main__":

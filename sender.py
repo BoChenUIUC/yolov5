@@ -22,25 +22,22 @@ def deepcod_send():
 
 	crs = [0.173]#,0.312,0.236,0.251,0.16,0.15,0.03,0.173,0.036,0.025]
 
-	data = b""
+	rdata = b""
 	for cr in crs:
 		size = int(32*32*3*cr)
-		data = bytearray(os.urandom(size))
-		data = struct.pack(">L", len(data))+data
+		sdata = bytearray(os.urandom(size))
+		msg_size = len(sdata)
+		sdata = struct.pack(">L", len(sdata))+sdata
 		for i in range(10):
 			t1 = datetime.datetime.now()
-			client.send(data)
-			while len(data) < payload_size:
-				data += client.recv(4096)
-			msg_size = struct.unpack(">L", data[:payload_size])[0]
-			data = data[payload_size:]
-			while len(data) < msg_size:
+			client.send(sdata)
+			while len(rdata) < msg_size:
 				tmp_str = client.recv(4096)
 				if not tmp_str:break
-				data += tmp_str
-			data = data[msg_size:]
+				rdata += tmp_str
+			rdata = rdata[msg_size:]
 			rtt = (datetime.datetime.now() - t1).total_seconds()
-			print(rtt)
+			print(i,rtt)
 
 	# for cr in crs:
 	# 	size = int(224*224*3*cr)
