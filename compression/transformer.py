@@ -767,7 +767,7 @@ def test_dataloader():
 
 def test_speed():
 	image = cv2.imread('sample.jpg')
-	cv2.resize(image, dsize=(32,32), interpolation=cv2.INTER_LINEAR)
+	image = cv2.resize(image, dsize=(32,32), interpolation=cv2.INTER_LINEAR)
 	# # J2k
 	# j2t = 0
 	# for r in range(6):
