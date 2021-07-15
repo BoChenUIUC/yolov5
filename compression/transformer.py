@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys
 sys.path.append('..')
-# from compression.turbojpeg import TurboJPEG
+from compression.turbojpeg import TurboJPEG
 from compression.huffman import HuffmanCoding
 
 dataset = 'ucf101-24'
@@ -363,7 +363,7 @@ def tile_legacy(image, C_param, counter, snapshot=False):
 	tile_size = tilew * tileh
 	huffman = HuffmanCoding()
 	end = time.perf_counter()
-	total_time = 0
+	total_time = 0#end-start
 	for roi,dsize in zip(ROIs,tile_sizes):
 		x1,y1,x2,y2 = roi
 		crop = bgr_frame[y1:y2,x1:x2].copy()
@@ -767,6 +767,7 @@ def test_dataloader():
 
 def test_speed():
 	image = cv2.imread('sample.jpg')
+	image = cv2.resize(image, dsize=(32,32), interpolation=cv2.INTER_LINEAR)
 	# # J2k
 	# j2t = 0
 	# for r in range(6):
@@ -821,9 +822,9 @@ def test_speed():
 	st = 0
 	for r in [0.1*x for x in range(1,11)]:
 		img_h,img_w = image.shape[:2]
-		dsize = (int(img_w*r),int(r*img_h))
+		dsize = (int(img_w*r),int(r*img_h)) 
 		compressed = cv2.resize(image, dsize=dsize, interpolation=cv2.INTER_LINEAR)
-		start = time.perf_counter() 
+		start = time.perf_counter()
 		compressed = cv2.resize(compressed, dsize=(img_w,img_h), interpolation=cv2.INTER_LINEAR)
 		end = time.perf_counter()
 		st += end-start
