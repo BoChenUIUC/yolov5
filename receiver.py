@@ -36,10 +36,10 @@ def deepcod_recv():
 	cnt,total = 0,0
 	while True:
 		# decode time
-		while len(data) < 26:
-			data += conn.recv(4096)
-		edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f") - datetime.timedelta(seconds=time_offset)
-		data = data[26:]
+		# while len(data) < 26:
+		# 	data += conn.recv(4096)
+		# edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f") - datetime.timedelta(seconds=time_offset)
+		# data = data[26:]
 		while len(data) < payload_size:
 			data += conn.recv(4096)
 		msg_size = struct.unpack(">L", data[:payload_size])[0]
@@ -48,15 +48,16 @@ def deepcod_recv():
 			tmp_str = conn.recv(4096)
 			if not tmp_str:break
 			data += tmp_str
-		cloud_recv_time = datetime.datetime.now()
-		diff = (cloud_recv_time - edge_send_time).total_seconds()
-		# print('Received:',msg_size,len(data),diff)
+		print('Received:',msg_size,len(data))
 		cnt += 1
 		total += diff
+
 		if cnt == 10:
 			print('Avg:',msg_size,total/10.0)
 			cnt = 0
 			total = 0
+
+		conn.send(struct.pack(">L", msg_size))+data[:msg_size])
 		data = data[msg_size:]
 
 if __name__ == "__main__":
