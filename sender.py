@@ -31,11 +31,11 @@ def deepcod_send():
 			t1 = datetime.datetime.now()
 			client.send(data)
 			while len(data) < payload_size:
-				data += conn.recv(4096)
+				data += client.recv(4096)
 			msg_size = struct.unpack(">L", data[:payload_size])[0]
 			data = data[payload_size:]
 			while len(data) < msg_size:
-				tmp_str = conn.recv(4096)
+				tmp_str = client.recv(4096)
 				if not tmp_str:break
 				data += tmp_str
 			data = data[msg_size:]
