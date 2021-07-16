@@ -191,7 +191,7 @@ class LightweightEncoder(nn.Module):
 		quant_dist = torch.pow(x-self.centers, 2)
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
-		hardout = torch.sum(self.centers * (minval == quant_dist).type(torch.cuda.FloatTensor), dim=-1)
+		hardout = torch.sum(self.centers * (minval == quant_dist).type(torch.FloatTensor), dim=-1)
 		x = softout
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
@@ -257,21 +257,21 @@ def init_weights(m):
 
 def test_speed(cuda):
 	torch.manual_seed(1)
-	model = DeepCOD(use_subsampling=0).cuda()
+	model = DeepCOD(use_subsampling=0)
 	t1 = 0 
-	image = torch.randn(1,3,224,224).cuda()
+	image = torch.randn(1,3,224,224)
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
 	print(t1/10)
 	t1 = 0 
-	image = torch.randn(1,3,224,224).cuda()
+	image = torch.randn(1,3,224,224)
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
 	print(t1/10)
 	t1 = 0 
-	image = torch.randn(1,3,32,32).cuda()
+	image = torch.randn(1,3,32,32)
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
