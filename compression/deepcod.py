@@ -42,14 +42,13 @@ class DeepCOD(nn.Module):
 		x,r,t = self.encoder(x)
 
 		# reconstruct
-		start = time.perf_counter()
 		x = self.conv1(x)
 		x = self.resblock_up1(x)
 		x = self.conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
-		return x,r,time.perf_counter()-start
+		return x,r,t
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
 	w = w.view(N*C, H, W)
@@ -258,23 +257,21 @@ def init_weights(m):
 
 def test_speed(cuda):
 	torch.manual_seed(1)
-	model = DeepCOD(use_subsampling=0)
+	model = DeepCOD(use_subsampling=0).cuda()
 	t1 = 0 
-	image = torch.randn(1,3,32,32)
-	if cuda:
-		print('move to cuda')
-		image = image.cuda()
-		model = model.cuda()
+	image = torch.randn(1,3,224,224).cuda()
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
 	print(t1/10)
 	t1 = 0 
-	image = torch.randn(1,3,224,224)
-	if cuda:
-		print('move to cuda')
-		image = image.cuda()
-		model = model.cuda()
+	image = torch.randn(1,3,224,224).cuda()
+	for i in range(10):
+		x,r,dt1 = model((image))
+		t1 += dt1 
+	print(t1/10)
+	t1 = 0 
+	image = torch.randn(1,3,32,32).cuda()
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
