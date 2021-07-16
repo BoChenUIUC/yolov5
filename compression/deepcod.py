@@ -42,13 +42,14 @@ class DeepCOD(nn.Module):
 		x,r,t = self.encoder(x)
 
 		# reconstruct
+		start = time.perf_counter()
 		x = self.conv1(x)
 		x = self.resblock_up1(x)
 		x = self.conv2(x)
 		x = self.resblock_up2(x)
 		x = self.output_conv(x)
 		
-		return x,r,t
+		return x,r,time.perf_counter()-start
 def orthorgonal_regularizer(w,scale,cuda=False):
 	N, C, H, W = w.size()
 	w = w.view(N*C, H, W)
@@ -191,7 +192,7 @@ class LightweightEncoder(nn.Module):
 		quant_dist = torch.pow(x-self.centers, 2)
 		softout = torch.sum(self.centers * nn.functional.softmax(-quant_dist, dim=-1), dim=-1)
 		minval,index = torch.min(quant_dist, dim=-1, keepdim=True)
-		hardout = torch.sum(self.centers * (minval == quant_dist), dim=-1)
+		hardout = torch.sum(self.centers * (minval == quant_dist).type(torch.cuda.FloatTensor), dim=-1)
 		x = softout
 		if self.use_subsampling:
 			comp_data = comp_data.view(*(list(comp_data.size()) + [1]))
@@ -257,24 +258,28 @@ def init_weights(m):
 
 def test_speed(cuda):
 	torch.manual_seed(1)
-	t1,t2 = 0,0
-	image = torch.randn(1,3,128,128)
 	model = DeepCOD(use_subsampling=0)
-	model2 = DeepCOD(use_subsampling=1)
+	t1 = 0 
+	image = torch.randn(1,3,32,32)
 	if cuda:
 		print('move to cuda')
 		image = image.cuda()
 		model = model.cuda()
-		model2 = model2.cuda()
-	print('start')
 	for i in range(10):
 		x,r,dt1 = model((image))
 		t1 += dt1 
-		x,r,dt2 = model2((image,0.5))
-		t2 += dt2
-		print(i,dt1,dt2)
-	print(t1/10,t2/10)
+	print(t1/10)
+	t1 = 0 
+	image = torch.randn(1,3,224,224)
+	if cuda:
+		print('move to cuda')
+		image = image.cuda()
+		model = model.cuda()
+	for i in range(10):
+		x,r,dt1 = model((image))
+		t1 += dt1 
+	print(t1/10)
 
 if __name__ == '__main__':
-	test_speed(False)
+	test_speed(True)
 	
