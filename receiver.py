@@ -56,6 +56,7 @@ def deepcod_recv():
 		if cnt == 10:
 			print('Avg:',total/10.0)
 			cnt = 0
+			total = 0
 		data = data[msg_size:]
 	# while True:
 	# 	while len(data) < payload_size:
