@@ -17,9 +17,10 @@ def deepcod_send():
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	payload_size = struct.calcsize(">L")
 	# ADDR = ("127.0.0.1",8848)
-	ADDR = ("130.126.136.154",8848)
+	ADDR = ("130.126.136.154",8000)
 	client.connect(ADDR)
 
+	crs = [0.0039,0.0049,0.024,0.036,0.166]
 	for cr in crs:
 		size = int(224*224*3*cr)
 		data = bytearray(os.urandom(size))
