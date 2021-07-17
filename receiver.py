@@ -54,7 +54,7 @@ def deepcod_recv():
 		cnt += 1
 		total += diff
 		if cnt == 10:
-			print('Avg:',total/10.0)
+			print(msg_size,total/10.0)
 			cnt = 0
 			total = 0
 		data = data[msg_size:]
