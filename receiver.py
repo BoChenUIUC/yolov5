@@ -33,7 +33,13 @@ def deepcod_recv():
 	# connect to edge
 	print('Connected.')
 	data = b""
+	cnt,total = 0,0
 	while True:
+		# decode time
+		while len(data) < 26:
+			data += conn.recv(4096)
+		edge_send_time = datetime.datetime.strptime(data[:26].decode(), "%Y-%m-%d %H:%M:%S.%f") - datetime.timedelta(seconds=time_offset)
+		data = data[26:]
 		while len(data) < payload_size:
 			data += conn.recv(4096)
 		msg_size = struct.unpack(">L", data[:payload_size])[0]
@@ -42,10 +48,27 @@ def deepcod_recv():
 			tmp_str = conn.recv(4096)
 			if not tmp_str:break
 			data += tmp_str
-		print('Received:',msg_size,len(data))
-
-		conn.send(data[:msg_size])
+		cloud_recv_time = datetime.datetime.now()
+		diff = (cloud_recv_time - edge_send_time).total_seconds()
+		print('Received:',msg_size,len(data),diff)
+		cnt += 1
+		total += diff
+		if cnt == 10:
+			print('Avg:',total/10.0)
 		data = data[msg_size:]
+	# while True:
+	# 	while len(data) < payload_size:
+	# 		data += conn.recv(4096)
+	# 	msg_size = struct.unpack(">L", data[:payload_size])[0]
+	# 	data = data[payload_size:]
+	# 	while len(data) < msg_size:
+	# 		tmp_str = conn.recv(4096)
+	# 		if not tmp_str:break
+	# 		data += tmp_str
+	# 	print('Received:',msg_size,len(data))
+
+	# 	conn.send(data[:msg_size])
+	# 	data = data[msg_size:]
 
 if __name__ == "__main__":
 	np.random.seed(123)
