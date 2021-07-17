@@ -13,13 +13,15 @@ import socket
 import os
 import datetime
 
+
+
 def deepcod_send():
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	payload_size = struct.calcsize(">L")
 	# ADDR = ("127.0.0.1",8848)
 	ADDR = ("130.126.136.154",8000)
 	client.connect(ADDR)
-
+	delta = datetime.timedelta(seconds=0.060)
 	crs = [0.15/32,0.03,0.173/32,0.036,0.025]
 	for cr in crs:
 		size = int(224*224*3*cr)
@@ -28,8 +30,7 @@ def deepcod_send():
 		print(cr,size,len(data))
 		for i in range(10):
 			time.sleep(0.5)
-			time_str = str(datetime.datetime.now())
-			print(cr,size,len(data))
+			time_str = str(datetime.datetime.now()-delta)
 			client.send(str.encode(time_str)+data)
 
 	crs = [0.173/32,0.312,0.236/32,0.251,0.16]
@@ -40,8 +41,7 @@ def deepcod_send():
 		print(cr,size,len(data))
 		for i in range(10):
 			time.sleep(0.5)
-			time_str = str(datetime.datetime.now())
-			print(cr,size,len(data))
+			time_str = str(datetime.datetime.now()-delta)
 			client.send(str.encode(time_str)+data)
 	client.close()
 
